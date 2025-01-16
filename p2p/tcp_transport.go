@@ -91,5 +91,4 @@ func (t *TCPTransport) HandleConn(conn net.Conn) {
 		fmt.Printf("dropping peer connection: %s\n", err)
 		conn.Close()
 	}()
-
 }
