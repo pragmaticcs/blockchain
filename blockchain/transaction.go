@@ -28,7 +28,7 @@ func (t *Transaction) CalculateID() (TransactionID, error) {
 }
 
 type TxOutput struct {
-	Value  uint64 // Amout of coins
+	Value  uint64 // AmouNt of coins
 	PubKey crypto.PubKey
 }
 
@@ -44,8 +44,8 @@ func NewCoinbase(value uint64, to crypto.PubKey, sig crypto.Signature) (*Transac
 		PubKey: to,
 	}
 	txIn := TxInput{
-		ID:  []byte{}, // Empty ID
-		Out: -1,       // No Reference
+		ID:  nil, // Empty ID
+		Out: -1,  // No Reference
 		Sig: sig,
 	}
 	coinbase := &Transaction{
@@ -62,7 +62,7 @@ func NewCoinbase(value uint64, to crypto.PubKey, sig crypto.Signature) (*Transac
 }
 
 func (t *Transaction) IsCoinbase() bool {
-	return len(t.Inputs) == 1 && len(t.Inputs[0].ID) == 0 && t.Inputs[0].Out == -1
+	return len(t.Inputs) == 1 && len(t.Inputs[0].ID) == 0 && t.Inputs[0].Out == -1 //FIX
 }
 
 func (in *TxOutput) CanUnlock(pub crypto.PubKey) bool {

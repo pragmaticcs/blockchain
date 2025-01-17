@@ -5,21 +5,25 @@ type BlockChain struct {
 	blocks         []*Block
 }
 
-func NewBlockChain(difficulty int) *BlockChain {
+func NewBlockChain(difficulty int) (*BlockChain, error) {
+	genesis, err := CreateGenesisBlock()
+	if err != nil {
+		return nil, err
+	}
 	return &BlockChain{
 		currDifficulty: uint(difficulty),
 		blocks: []*Block{
-			CreateGenesisBlock(),
+			genesis,
 		},
-	}
+	}, nil
 }
 
 func (b *BlockChain) PrevBlock() *Block {
 	return b.blocks[len(b.blocks)-1]
 }
 
-func (b *BlockChain) AddBlock(data []byte) *Block {
-	block := NewBlock(b.PrevBlock().Hash, data)
+func (b *BlockChain) AddBlock(transactions []*Transaction) *Block {
+	block := NewBlock(b.PrevBlock().Hash, transactions)
 	pow := NewPOW(block, b.currDifficulty)
 	nonce, hash := pow.Run()
 	block.Nonce = nonce
