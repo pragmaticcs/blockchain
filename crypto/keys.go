@@ -1,5 +1,5 @@
 package crypto
 
-type PubKey [32]byte
+type PubKey = []byte // 32
 
-type Signature [32]byte
+type Signature = []byte // 32

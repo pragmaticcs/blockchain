@@ -13,13 +13,13 @@ func TestGobEncoderDecoder(t *testing.T) {
 	block := bch.AddBlock([]byte("data"))
 
 	encoderDecoder := GobEncoderDecoder{}
-	encoding, err := encoderDecoder.Encode(block)
+	encoding, err := encoderDecoder.EncodeBlock(block)
 	if err != nil {
 		t.Error(err)
 	}
 	fmt.Println("Gob Encoding: ", encoding)
 
-	decoding, err := encoderDecoder.Decode(encoding)
+	decoding, err := encoderDecoder.DecodeBlock(encoding)
 	if err != nil {
 		t.Error(err)
 	}
