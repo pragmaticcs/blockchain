@@ -54,6 +54,7 @@ func (b *Block) GetTransactionsData() []byte {
 }
 
 func (b *Block) GetData() []byte {
+	// Converts block into bytes
 	data := bytes.Join([][]byte{
 		b.PrevHash[:],
 		b.GetTransactionsData()},
@@ -62,11 +63,13 @@ func (b *Block) GetData() []byte {
 }
 
 func (b *Block) GetHash() []byte {
+	// Returns the hash of the block
 	hash := sha256.Sum256(b.GetData())
 	return hash[:]
 }
 
 func GetHexValue(i int32) []byte {
+	// Converting an integer into binary
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.BigEndian, i)
 	if err != nil {

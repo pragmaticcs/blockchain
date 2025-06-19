@@ -8,13 +8,14 @@ import (
 )
 
 type POW struct {
-	// Proof of Work requiered to mine the block
+	// Proof of Work required to mine the block
 	Block      *Block
 	Target     *big.Int
 	Difficulty uint
 }
 
 func NewPOW(b *Block, difficulty uint) *POW {
+	// Creating a new Proof of Work with given block and difficulty
 	target := big.NewInt(1)
 	return &POW{
 		Block:      b,
@@ -24,6 +25,7 @@ func NewPOW(b *Block, difficulty uint) *POW {
 }
 
 func (p *POW) GetData(nonce int32) []byte {
+	// Converts POW to bytes
 	return bytes.Join([][]byte{
 		p.Block.GetData(),
 		GetHexValue(nonce),
