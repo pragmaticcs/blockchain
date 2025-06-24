@@ -12,6 +12,7 @@ import (
 	"math/big"
 
 	"github.com/pragmaticcs/blockchain/crypto"
+	"github.com/pragmaticcs/blockchain/wallet"
 )
 
 type TransactionID = []byte
@@ -20,6 +21,59 @@ type Transaction struct {
 	ID      TransactionID
 	Inputs  []TxInput
 	Outputs []TxOutput
+}
+
+func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int) (*Transaction, error) {
+	var inputs []TxInput
+	var outputs []TxOutput
+
+	wallets, err := wallet.InitWallets()
+	if err != nil {
+		return nil, err
+	}
+	sender, err := wallets.GetWallet(from)
+	if err != nil {
+		return nil, err
+	}
+	pubKeyHash, err := crypto.HashPublicKey(sender.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	sum, outs, err := b.FindSpendableOutputs(pubKeyHash, amount)
+	if err != nil {
+		return nil, err
+	}
+	if sum < int64(amount) {
+		return nil, NewTransactionError(fmt.Sprintf("account [%s] has insufficient funds for transaction", from))
+	}
+	for txID, outIDarray := range outs {
+		txIDbytes, err := hex.DecodeString(txID)
+		if err != nil {
+			return nil, err
+		}
+		for _, outID := range outIDarray {
+			in := TxInput{
+				TxID:   txIDbytes,
+				OutID:  outID,
+				Sig:    nil,
+				PubKey: sender.PublicKey,
+			}
+			inputs = append(inputs, in)
+		}
+	}
+	outputs = append(outputs, *NewTxOutput(amount, []byte(to)))
+
+	tx := &Transaction{
+		ID:      nil,
+		Outputs: outputs,
+		Inputs:  inputs,
+	}
+	txID, err := tx.GetHash()
+	if err != nil {
+		return nil, err
+	}
+	tx.ID = txID
+	return tx, nil
 }
 
 func (t *Transaction) GetHash() ([]byte, error) {
@@ -313,12 +367,12 @@ func (b *BlockChain) FindUTXO(pubKeyHash []byte) ([]TxOutput, error) {
 	return utxos, nil
 }
 
-func (b *BlockChain) FindSpendableOutputs(pubKeyHash []byte, amount int) (map[string][]int, error) {
+func (b *BlockChain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, map[string][]int, error) {
 	// Returns a hash map of transaction id / array of indexes of outputs
 	unspentTxs, err := b.FindUnspentTransactions(pubKeyHash)
 	spendableOuts := make(map[string][]int)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	var currSum int64 = 0
 Outer:
@@ -334,7 +388,7 @@ Outer:
 			}
 		}
 	}
-	return spendableOuts, nil
+	return currSum, spendableOuts, nil
 }
 
 type TransactionError struct {

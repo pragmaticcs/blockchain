@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/pragmaticcs/blockchain/crypto"
 )
+
+type Address string
 
 const (
 	AddressLength  = 4
@@ -16,13 +19,53 @@ const (
 )
 
 type Wallets struct {
-	Wallets map[string]*Wallet
+	Wallets map[Address]*Wallet
 }
 
 type Wallet struct {
 	PrivateKey    ecdsa.PrivateKey
 	PublicKey     crypto.PubKey
 	AddressLength int
+}
+
+func (w *Wallets) AddWallet() (Address, error) {
+	newWallet, err := NewWallet()
+	if err != nil {
+		return "", err
+	}
+	address, err := newWallet.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	w.Wallets[address] = newWallet
+	return address, nil
+}
+
+func (w *Wallets) GetWallet(addr Address) (*Wallet, error) {
+	wallet, ok := w.Wallets[addr]
+	if !ok {
+		return nil, NewWalletError(fmt.Sprintf("wallet with address [%s] doesn't exist", addr))
+	}
+	return wallet, nil
+}
+
+func (w *Wallets) GetAllAddresses() []Address {
+	var addresses []Address
+
+	for a := range w.Wallets {
+		addresses = append(addresses, a)
+	}
+	return addresses
+}
+
+func InitWallets() (*Wallets, error) {
+	wallets, err := LoadWalletsFromFile()
+	if os.IsNotExist(err) {
+		// If the file doesn't exist - return empty struct
+		wallets = &Wallets{}
+		err = nil
+	}
+	return wallets, err
 }
 
 func NewWallet() (*Wallet, error) {
@@ -38,17 +81,17 @@ func NewWallet() (*Wallet, error) {
 	}, nil
 }
 
-func (w *Wallet) GetAddress() ([]byte, error) {
+func (w *Wallet) GetAddress() (Address, error) {
 	hash, err := crypto.HashPublicKey(w.PublicKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	versionedHash := append([]byte{byte(AddressVersion)}, hash...)
 	checksum := crypto.Checksum(versionedHash, w.AddressLength)
 
 	fullHash := append(versionedHash, checksum...)
 	address := crypto.EncodeToBase58(fullHash)
-	return address, nil
+	return Address(address), nil
 }
 
 func SaveWalletsToFile(w *Wallets) error {
@@ -75,4 +118,16 @@ func LoadWalletsFromFile() (*Wallets, error) {
 	var wallets Wallets
 	decoder.Decode(&wallets)
 	return &wallets, nil
+}
+
+type WalletError struct {
+	Err string
+}
+
+func NewWalletError(e string) WalletError {
+	return WalletError{Err: e}
+}
+
+func (e WalletError) Error() string {
+	return fmt.Sprintf("Wallet error: %s", e.Err)
 }

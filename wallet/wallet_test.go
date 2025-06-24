@@ -17,7 +17,7 @@ func TestWalletAddress(t *testing.T) {
 }
 
 func TestWalletsFile(t *testing.T) {
-	walletSet := make(map[string]*Wallet)
+	walletSet := make(map[Address]*Wallet)
 	for i := 0; i < 10; i++ {
 		wallet, err := NewWallet()
 		if err != nil {
@@ -27,7 +27,7 @@ func TestWalletsFile(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		walletSet[string(address)] = wallet
+		walletSet[address] = wallet
 	}
 	wallets := Wallets{
 		Wallets: walletSet,

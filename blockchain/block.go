@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"log"
+
+	"github.com/pragmaticcs/blockchain/crypto"
 )
 
 type BlockHeader struct {
@@ -78,9 +80,8 @@ func GetHexValue(i int32) []byte {
 	return buf.Bytes()
 }
 
-func CreateGenesisBlock() (*Block, error) {
-	// TODO: Make this cleaner with a config for genesis
-	coinbase, err := NewCoinbase(1000, []byte("my public key"), []byte("my signature"))
+func CreateGenesisBlock(value int, to crypto.PubKey, sig crypto.Signature) (*Block, error) {
+	coinbase, err := NewCoinbase(int64(value), to, sig)
 	if err != nil {
 		return nil, err
 	}

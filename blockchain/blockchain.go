@@ -1,12 +1,20 @@
 package blockchain
 
+import "github.com/pragmaticcs/blockchain/crypto"
+
 type BlockChain struct {
 	currDifficulty uint
 	blocks         []*Block
 }
 
-func NewBlockChain(difficulty int) (*BlockChain, error) {
-	genesis, err := CreateGenesisBlock()
+type GenesisConfig struct {
+	Amount int
+	To     crypto.PubKey
+	Sig    crypto.Signature
+}
+
+func NewBlockChain(difficulty int, genesisConfig GenesisConfig) (*BlockChain, error) {
+	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.To, genesisConfig.Sig)
 	if err != nil {
 		return nil, err
 	}
