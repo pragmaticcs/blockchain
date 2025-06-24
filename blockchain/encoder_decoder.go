@@ -14,7 +14,7 @@ type GobEncoderDecoder struct{}
 
 func (g *GobEncoderDecoder) EncodeBlock(b *Block) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := gob.NewEncoder(buf).Encode(b)
+	err := gob.NewEncoder(buf).Encode(*b)
 	if err != nil {
 		return nil, err
 	}

@@ -21,5 +21,4 @@ func main() {
 		}
 		fmt.Printf("Mined block %d. Nonce = %d\n", i, block.Nonce)
 	}
-
 }

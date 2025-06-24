@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
-	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/ripemd160" // Bitcoin uses ripemd160 so we going to ignore the deprecated warning
 )
 
 func HashPublicKey(key PubKey) ([]byte, error) {

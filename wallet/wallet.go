@@ -1,7 +1,10 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/ecdsa"
+	"encoding/json"
+	"os"
 
 	"github.com/pragmaticcs/blockchain/crypto"
 )
@@ -9,6 +12,7 @@ import (
 const (
 	AddressLength  = 4
 	AddressVersion = 0
+	FilePath       = "wallets.json"
 )
 
 type Wallets struct {
@@ -45,4 +49,30 @@ func (w *Wallet) GetAddress() ([]byte, error) {
 	fullHash := append(versionedHash, checksum...)
 	address := crypto.EncodeToBase58(fullHash)
 	return address, nil
+}
+
+func SaveWalletsToFile(w *Wallets) error {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	encoder := json.NewEncoder(buf)
+	if err := encoder.Encode(w); err != nil {
+		return err
+	}
+	return os.WriteFile(FilePath, buf.Bytes(), 0644)
+}
+
+func LoadWalletsFromFile() (*Wallets, error) {
+	if _, err := os.Stat(FilePath); os.IsNotExist(err) {
+		return nil, err
+	}
+	fileBytes, err := os.ReadFile(FilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(fileBytes)
+	decoder := json.NewDecoder(buf)
+	var wallets Wallets
+	decoder.Decode(&wallets)
+	return &wallets, nil
 }

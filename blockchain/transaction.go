@@ -2,10 +2,14 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"slices"
+	"fmt"
+	"math/big"
 
 	"github.com/pragmaticcs/blockchain/crypto"
 )
@@ -18,31 +22,56 @@ type Transaction struct {
 	Outputs []TxOutput
 }
 
-func (t *Transaction) CalculateID() (TransactionID, error) {
-	buf := new(bytes.Buffer)
-	err := gob.NewEncoder(buf).Encode(t)
+func (t *Transaction) GetHash() ([]byte, error) {
+	tx := *t
+	tx.ID = []byte{}
+	data, err := tx.GetData()
 	if err != nil {
 		return nil, err
 	}
-	hash := sha256.Sum256(buf.Bytes())
+	hash := sha256.Sum256(data)
 	return hash[:], nil
 }
 
+func (t *Transaction) GetData() ([]byte, error) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	encoder := gob.NewEncoder(buf)
+	if err := encoder.Encode(*t); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 type TxOutput struct {
-	Value  int64 // Amount of coins
-	PubKey crypto.PubKey
+	Value      int64 // Amount of coins
+	PubKeyHash []byte
+}
+
+func NewTxOutput(value int, address []byte) *TxOutput {
+	out := &TxOutput{
+		Value:      int64(value),
+		PubKeyHash: nil,
+	}
+	LockOutput(out, address)
+	return out
 }
 
 type TxInput struct {
-	TxID  TransactionID // Points to the ID of the Transaction
-	OutID int           // Points to the index of Tx in the list of Tx's inside the Transaction [ID]
-	Sig   crypto.Signature
+	TxID   TransactionID // Points to the ID of the Transaction
+	OutID  int           // Points to the index of Tx in the list of Tx's inside the Transaction [ID]
+	Sig    crypto.Signature
+	PubKey crypto.PubKey
 }
 
 func NewCoinbase(value int64, to crypto.PubKey, sig crypto.Signature) (*Transaction, error) {
+	pubKeyHash, err := crypto.HashPublicKey(to)
+	if err != nil {
+		return nil, err
+	}
 	txOut := TxOutput{
-		Value:  value,
-		PubKey: to,
+		Value:      value,
+		PubKeyHash: pubKeyHash,
 	}
 	txIn := TxInput{
 		TxID:  nil, // Empty ID
@@ -54,7 +83,7 @@ func NewCoinbase(value int64, to crypto.PubKey, sig crypto.Signature) (*Transact
 		Inputs:  []TxInput{txIn},
 		Outputs: []TxOutput{txOut},
 	}
-	id, err := coinbase.CalculateID()
+	id, err := coinbase.GetHash()
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +96,107 @@ func (t *Transaction) IsCoinbase() bool {
 	return len(t.Inputs) == 1 && t.Inputs[0].TxID == nil && t.Inputs[0].OutID == -1
 }
 
-func (in *TxInput) CanUnlock(sig crypto.Signature) bool {
-	// Currently a temporary function
-	return slices.Equal(in.Sig, sig)
+func (out *TxOutput) IsLockedWithKey(pubkeyHash []byte) bool {
+	return bytes.Equal(out.PubKeyHash, pubkeyHash)
 }
 
-func (out *TxOutput) CanBeUnlocked(pub crypto.PubKey) bool {
-	// Currently a temporary function
-	return slices.Equal(out.PubKey, pub)
+func (in *TxInput) UsesKey(pubkeyHash []byte) (bool, error) {
+	lockingHash, err := crypto.HashPublicKey(in.PubKey)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(lockingHash, pubkeyHash), nil
 }
 
-func (b *BlockChain) FindUnspentTransactions(pub crypto.PubKey) []*Transaction {
+func LockOutput(out *TxOutput, address []byte) {
+	pubkeyHash := crypto.DecodeFromBase58(address)
+	pubkeyHash = pubkeyHash[1 : len(pubkeyHash)-4]
+	out.PubKeyHash = pubkeyHash
+}
+
+func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTxs map[string]Transaction) error {
+	if tx.IsCoinbase() {
+		return NewTransactionError("coinbase can't be signed")
+	}
+
+	for _, in := range tx.Inputs {
+		// Check if inputs are valid
+		if prevTxs[hex.EncodeToString(in.TxID)].ID == nil {
+			return NewTransactionError("previous transaction doesn't exist")
+		}
+	}
+	txCopy := *tx
+
+	for id, in := range txCopy.Inputs {
+		prevTx := prevTxs[hex.EncodeToString(in.TxID)]
+		txCopy.Inputs[id].Sig = nil
+		txCopy.Inputs[id].PubKey = prevTx.Outputs[in.OutID].PubKeyHash
+		txID, err := txCopy.GetHash()
+		if err != nil {
+			return err
+		}
+		txCopy.Inputs[id].TxID = txID
+		txCopy.Inputs[id].PubKey = nil
+
+		r, s, err := ecdsa.Sign(rand.Reader, &privKey, txCopy.ID)
+		if err != nil {
+			return err
+		}
+		sig := append(r.Bytes(), s.Bytes()...)
+
+		tx.Inputs[id].Sig = sig
+	}
+	return nil
+}
+
+func (tx *Transaction) Verify(prevTxs map[string]Transaction) (bool, error) {
+	if tx.IsCoinbase() {
+		return true, nil
+	}
+
+	for _, in := range tx.Inputs {
+		// Check if inputs are valid
+		if prevTxs[hex.EncodeToString(in.TxID)].ID == nil {
+			return false, NewTransactionError("previous transaction doesn't exist")
+		}
+	}
+	txCopy := *tx
+	curve := elliptic.P256()
+
+	for id, in := range txCopy.Inputs {
+		prevTx := prevTxs[hex.EncodeToString(in.TxID)]
+		txCopy.Inputs[id].Sig = nil
+		txCopy.Inputs[id].PubKey = prevTx.Outputs[in.OutID].PubKeyHash
+		txID, err := txCopy.GetHash()
+		if err != nil {
+			return false, err
+		}
+		txCopy.Inputs[id].TxID = txID
+		txCopy.Inputs[id].PubKey = nil
+
+		var r big.Int
+		var s big.Int
+		sigLen := len(in.Sig)
+		r.SetBytes(in.Sig[:(sigLen / 2)])
+		s.SetBytes(in.Sig[(sigLen / 2):])
+
+		var x big.Int
+		var y big.Int
+
+		keyLen := len(in.PubKey)
+		x.SetBytes(in.PubKey[:(keyLen / 2)])
+		y.SetBytes(in.PubKey[(keyLen / 2):])
+
+		ecdsaPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+
+		if !ecdsa.Verify(&ecdsaPubKey, txCopy.ID, &r, &s) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (b *BlockChain) FindUnspentTransactions(pubKeyHash []byte) ([]*Transaction, error) {
 	var unspentTxs []*Transaction
 	// Each transaction has a corresponding array of ids
 	// that point to the spent outputs in the transaction's array of outputs
@@ -113,7 +232,7 @@ func (b *BlockChain) FindUnspentTransactions(pub crypto.PubKey) []*Transaction {
 					}
 				}
 				// Check if the output is owned by the owner of pubkey
-				if txOut.CanBeUnlocked(pub) {
+				if txOut.IsLockedWithKey(pubKeyHash) {
 					unspentTxs = append(unspentTxs, tx)
 				}
 			}
@@ -123,7 +242,11 @@ func (b *BlockChain) FindUnspentTransactions(pub crypto.PubKey) []*Transaction {
 				// For each input in the transaction's list of inputs
 				for _, in := range tx.Inputs {
 					// Check if the input is owned by the owner of pubkey
-					if in.CanUnlock(pub) {
+					usesKey, err := in.UsesKey(pubKeyHash)
+					if err != nil {
+						return nil, err
+					}
+					if usesKey {
 						inID := hex.EncodeToString(in.TxID)
 						// Add the output the input uses to the set of spent outputs
 						spentTXOs[inID] = append(spentTXOs[inID], in.OutID)
@@ -132,9 +255,96 @@ func (b *BlockChain) FindUnspentTransactions(pub crypto.PubKey) []*Transaction {
 			}
 		}
 	}
-	return unspentTxs
+	return unspentTxs, nil
 }
 
-func (b *BlockChain) FindUTXO(address crypto.PubKey) {
+func (b *BlockChain) FindTransaction(id []byte) (*Transaction, error) {
+	iter := b.ToIterator()
 
+	for currBlock := iter.Backward(); currBlock != nil; currBlock = iter.Backward() {
+		for _, tx := range currBlock.Transactions {
+			if bytes.Equal(tx.ID, id) {
+				return tx, nil
+			}
+		}
+	}
+	return nil, NewTransactionError("transaction doesn't exist")
+}
+
+func (b *BlockChain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) error {
+	prevTxs := make(map[string]Transaction)
+
+	for _, in := range tx.Inputs {
+		prevTx, err := b.FindTransaction(in.TxID)
+		if err != nil {
+			return err
+		}
+		prevTxs[hex.EncodeToString(prevTx.ID)] = *prevTx
+	}
+	return tx.Sign(privateKey, prevTxs)
+}
+
+func (b *BlockChain) VerifyTransaction(tx *Transaction) (bool, error) {
+	prevTxs := make(map[string]Transaction)
+
+	for _, in := range tx.Inputs {
+		prevTx, err := b.FindTransaction(in.TxID)
+		if err != nil {
+			return false, err
+		}
+		prevTxs[hex.EncodeToString(prevTx.ID)] = *prevTx
+	}
+	return tx.Verify(prevTxs)
+}
+
+func (b *BlockChain) FindUTXO(pubKeyHash []byte) ([]TxOutput, error) {
+	var utxos []TxOutput
+	unspentTransactions, err := b.FindUnspentTransactions(pubKeyHash)
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range unspentTransactions {
+		for _, out := range tx.Outputs {
+			if out.IsLockedWithKey(pubKeyHash) {
+				utxos = append(utxos, out)
+			}
+		}
+	}
+	return utxos, nil
+}
+
+func (b *BlockChain) FindSpendableOutputs(pubKeyHash []byte, amount int) (map[string][]int, error) {
+	// Returns a hash map of transaction id / array of indexes of outputs
+	unspentTxs, err := b.FindUnspentTransactions(pubKeyHash)
+	spendableOuts := make(map[string][]int)
+	if err != nil {
+		return nil, err
+	}
+	var currSum int64 = 0
+Outer:
+	for _, tx := range unspentTxs {
+		txID := hex.EncodeToString(tx.ID)
+		for id, out := range tx.Outputs {
+			if out.IsLockedWithKey(pubKeyHash) && currSum < int64(amount) {
+				currSum += out.Value
+				spendableOuts[txID] = append(spendableOuts[txID], id)
+				if currSum >= int64(amount) {
+					break Outer
+				}
+			}
+		}
+	}
+	return spendableOuts, nil
+}
+
+type TransactionError struct {
+	Err string
+}
+
+func NewTransactionError(e string) TransactionError {
+	return TransactionError{Err: e}
+}
+
+func (e TransactionError) Error() string {
+	return fmt.Sprintf("Transaction error: %s", e.Err)
 }
