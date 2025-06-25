@@ -8,52 +8,48 @@ import (
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
+func handle(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
-	wallets := wallet.Wallets{
-		Wallets: map[wallet.Address]*wallet.Wallet{},
+	wallets := &wallet.Wallets{
+		Wallets:      map[wallet.Address]*wallet.Wallet{},
+		SaveFilePath: "wallets.json",
 	}
 	bob, err := wallets.AddWallet()
-	if err != nil {
-		log.Fatal(err)
-	}
+	handle(err)
 	alice, err := wallets.AddWallet()
-	if err != nil {
-		log.Fatal(err)
-	}
+	handle(err)
 
-	wallet.SaveWalletsToFile(&wallets)
+	err = wallets.SaveWalletsToFile()
+	handle(err)
 
 	bobsWallet, err := wallets.GetWallet(bob)
-	if err != nil {
-		log.Fatal(err)
-	}
+	handle(err)
 	// alicesWallet, _ := wallets.GetWallet(alice)
 	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
-	difficulty := 12
-	bch, err := blockchain.NewBlockChain(difficulty, genesisConf)
+	difficulty := 20
+	bch, err := blockchain.NewBlockChain(difficulty, genesisConf, wallets)
+	handle(err)
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	bobBalance, err := bch.GetBalance(bob)
+	handle(err)
+	fmt.Printf("Bob's balance = %d\n", bobBalance)
 
-	firstTx, err := bch.NewTransaction(bob, alice, 10)
-	if err != nil {
-		log.Fatal(err)
-	}
-	block := bch.AddBlock([]*blockchain.Transaction{firstTx})
-	pow := blockchain.NewPOW(block, uint(difficulty))
-	if !pow.Validate() {
-		log.Fatal("Couldn't validate block")
-	}
-	fmt.Printf("Mined block. Nonce = %d\n", block.Nonce)
+	aliceBalance, err := bch.GetBalance(alice)
+	handle(err)
+	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 
-	// for i := 1; i <= 5; i++ {
-	// 	block := bch.AddBlock([]*blockchain.Transaction{})
-	// 	pow := blockchain.NewPOW(block, uint(difficulty))
-	// 	if !pow.Validate() {
-	// 		fmt.Printf("Couldn't validate block %d\n", i)
-	// 	}
-	// 	fmt.Printf("Mined block %d. Nonce = %d\n", i, block.Nonce)
-	// }
+	firstTx, err := bch.NewTransaction(bob, alice, 10, wallets)
+
+	handle(err)
+	bch.AddBlock([]*blockchain.Transaction{firstTx})
+
+	bobBalance, err = bch.GetBalance(bob)
+	handle(err)
+	fmt.Printf("Bob's balance = %d\n", bobBalance)
 }

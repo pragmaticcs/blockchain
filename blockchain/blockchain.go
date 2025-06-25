@@ -1,10 +1,14 @@
 package blockchain
 
-import "github.com/pragmaticcs/blockchain/crypto"
+import (
+	"github.com/pragmaticcs/blockchain/crypto"
+	"github.com/pragmaticcs/blockchain/wallet"
+)
 
 type BlockChain struct {
-	currDifficulty uint
-	blocks         []*Block
+	CurrDifficulty uint
+	Blocks         []*Block
+	Wallets        *wallet.Wallets
 }
 
 type GenesisConfig struct {
@@ -13,51 +17,64 @@ type GenesisConfig struct {
 	Sig    crypto.Signature
 }
 
-func NewBlockChain(difficulty int, genesisConfig GenesisConfig) (*BlockChain, error) {
+func NewBlockChain(difficulty int, genesisConfig GenesisConfig, wallets *wallet.Wallets) (*BlockChain, error) {
 	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.To, genesisConfig.Sig)
 	if err != nil {
 		return nil, err
 	}
 	return &BlockChain{
-		currDifficulty: uint(difficulty),
-		blocks: []*Block{
+		CurrDifficulty: uint(difficulty),
+		Blocks: []*Block{
 			genesis,
 		},
+		Wallets: wallets,
 	}, nil
 }
 
 type BlockChainIterator struct {
-	blocks    []*Block
-	currIndex int
+	Blocks    []*Block
+	CurrIndex int
 }
 
 func (b *BlockChain) ToIterator() *BlockChainIterator {
 	return &BlockChainIterator{
-		blocks:    b.blocks,
-		currIndex: len(b.blocks) - 1,
+		Blocks:    b.Blocks,
+		CurrIndex: len(b.Blocks) - 1,
 	}
 }
 
 func (b *BlockChainIterator) Backward() *Block {
-	defer func() { b.currIndex -= 1 }()
-	if b.currIndex < 0 {
+	defer func() { b.CurrIndex -= 1 }()
+	if b.CurrIndex < 0 {
 		return nil
 	}
-	return b.blocks[b.currIndex]
+	return b.Blocks[b.CurrIndex]
 }
 
 func (b *BlockChain) PrevBlock() *Block {
-	return b.blocks[len(b.blocks)-1]
+	return b.Blocks[len(b.Blocks)-1]
 }
 
 func (b *BlockChain) AddBlock(transactions []*Transaction) *Block {
 	// Add a block to the chain of blocks (Duh)
 	block := NewBlock(b.PrevBlock().Hash, transactions)
-	pow := NewPOW(block, b.currDifficulty)
+	pow := NewPOW(block, b.CurrDifficulty)
 	nonce, hash := pow.Run()
 	block.Nonce = nonce
 	copy(block.Hash[:], hash)
 
-	b.blocks = append(b.blocks, block)
+	b.Blocks = append(b.Blocks, block)
 	return block
+}
+
+func (b *BlockChain) GetBalance(addr wallet.Address) (int, error) {
+	wallet, err := b.Wallets.GetWallet(addr)
+	if err != nil {
+		return -1, err
+	}
+	pubKeyHash, err := crypto.HashPublicKey(wallet.PublicKey)
+	if err != nil {
+		return -1, err
+	}
+	return b.FindSpendableAmount(pubKeyHash)
 }

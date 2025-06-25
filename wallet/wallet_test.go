@@ -30,13 +30,14 @@ func TestWalletsFile(t *testing.T) {
 		walletSet[address] = wallet
 	}
 	wallets := Wallets{
-		Wallets: walletSet,
+		Wallets:      walletSet,
+		SaveFilePath: "wallets.json",
 	}
-	err := SaveWalletsToFile(&wallets)
+	err := wallets.SaveWalletsToFile()
 	if err != nil {
 		t.Error(err)
 	}
-	walletsFromFile, err := LoadWalletsFromFile()
+	walletsFromFile, err := LoadWalletsFromFile(wallets.SaveFilePath)
 	if err != nil {
 		t.Error(err)
 	}

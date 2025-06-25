@@ -23,14 +23,10 @@ type Transaction struct {
 	Outputs []TxOutput
 }
 
-func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int) (*Transaction, error) {
+func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets *wallet.Wallets) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
-	wallets, err := wallet.InitWallets()
-	if err != nil {
-		return nil, err
-	}
 	sender, err := wallets.GetWallet(from)
 	if err != nil {
 		return nil, err
@@ -40,6 +36,7 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int) (*Trans
 		return nil, err
 	}
 	sum, outs, err := b.FindSpendableOutputs(pubKeyHash, amount)
+	fmt.Println(outs)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +58,10 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int) (*Trans
 			inputs = append(inputs, in)
 		}
 	}
-	outputs = append(outputs, *NewTxOutput(amount, []byte(to)))
+	outputs = append(outputs, *NewTxOutput(amount, []byte(to))) // Transfer to reciever
+	if sum > int64(amount) {
+		outputs = append(outputs, *NewTxOutput(int(sum)-amount, []byte(from))) // Transfer change back
+	}
 
 	tx := &Transaction{
 		ID:      nil,
@@ -365,6 +365,18 @@ func (b *BlockChain) FindUTXO(pubKeyHash []byte) ([]TxOutput, error) {
 		}
 	}
 	return utxos, nil
+}
+
+func (b *BlockChain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
+	utxos, err := b.FindUTXO(pubKeyHash)
+	if err != nil {
+		return -1, err
+	}
+	var balance int64 = 0
+	for _, utxo := range utxos {
+		balance += utxo.Value
+	}
+	return int(balance), nil
 }
 
 func (b *BlockChain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, map[string][]int, error) {
