@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -17,6 +18,8 @@ func TestWalletAddress(t *testing.T) {
 }
 
 func TestWalletsFile(t *testing.T) {
+	temp_dir := t.TempDir()
+	t.Log(temp_dir)
 	walletSet := make(map[Address]*Wallet)
 	for i := 0; i < 10; i++ {
 		wallet, err := NewWallet()
@@ -31,7 +34,7 @@ func TestWalletsFile(t *testing.T) {
 	}
 	wallets := Wallets{
 		Wallets:      walletSet,
-		SaveFilePath: "wallets.json",
+		SaveFilePath: fmt.Sprintf("%s/wallets.json", temp_dir),
 	}
 	err := wallets.SaveWalletsToFile()
 	if err != nil {

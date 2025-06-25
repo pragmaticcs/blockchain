@@ -38,7 +38,10 @@ func InitWallets(saveFilePath string) (*Wallets, error) {
 	wallets, err := LoadWalletsFromFile(saveFilePath)
 	if os.IsNotExist(err) {
 		// If the file doesn't exist - return empty struct
-		wallets = &Wallets{}
+		wallets = &Wallets{
+			Wallets:      map[Address]*Wallet{},
+			SaveFilePath: saveFilePath,
+		}
 		err = nil
 	}
 	return wallets, err

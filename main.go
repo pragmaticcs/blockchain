@@ -15,24 +15,19 @@ func handle(err error) {
 }
 
 func main() {
-	wallets := &wallet.Wallets{
-		Wallets:      map[wallet.Address]*wallet.Wallet{},
-		SaveFilePath: "wallets.json",
-	}
+	wallets, err := wallet.InitWallets("wallets.json")
+	handle(err)
+
 	bob, err := wallets.AddWallet()
 	handle(err)
 	alice, err := wallets.AddWallet()
 	handle(err)
 
-	err = wallets.SaveWalletsToFile()
-	handle(err)
-
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
-	// alicesWallet, _ := wallets.GetWallet(alice)
 	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
-	difficulty := 20
+	difficulty := 22
 	bch, err := blockchain.NewBlockChain(difficulty, genesisConf, wallets)
 	handle(err)
 
@@ -48,8 +43,13 @@ func main() {
 
 	handle(err)
 	bch.AddBlock([]*blockchain.Transaction{firstTx})
+	fmt.Println("Mining new block with transaction")
 
 	bobBalance, err = bch.GetBalance(bob)
 	handle(err)
 	fmt.Printf("Bob's balance = %d\n", bobBalance)
+
+	aliceBalance, err = bch.GetBalance(alice)
+	handle(err)
+	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 }

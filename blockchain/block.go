@@ -80,8 +80,8 @@ func GetHexValue(i int32) []byte {
 	return buf.Bytes()
 }
 
-func CreateGenesisBlock(value int, to crypto.PubKey, sig crypto.Signature) (*Block, error) {
-	coinbase, err := NewCoinbase(int64(value), to, sig)
+func CreateGenesisBlock(value int, to crypto.PubKey) (*Block, error) {
+	coinbase, err := NewCoinbase(int64(value), to)
 	if err != nil {
 		return nil, err
 	}

@@ -36,12 +36,11 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets
 		return nil, err
 	}
 	sum, outs, err := b.FindSpendableOutputs(pubKeyHash, amount)
-	fmt.Println(outs)
 	if err != nil {
 		return nil, err
 	}
 	if sum < int64(amount) {
-		return nil, NewTransactionError(fmt.Sprintf("account [%s] has insufficient funds for transaction", from))
+		return nil, wallet.ErrorInsufficientBalance
 	}
 	for txID, outIDarray := range outs {
 		txIDbytes, err := hex.DecodeString(txID)
@@ -118,7 +117,7 @@ type TxInput struct {
 	PubKey crypto.PubKey
 }
 
-func NewCoinbase(value int64, to crypto.PubKey, sig crypto.Signature) (*Transaction, error) {
+func NewCoinbase(value int64, to crypto.PubKey) (*Transaction, error) {
 	pubKeyHash, err := crypto.HashPublicKey(to)
 	if err != nil {
 		return nil, err
@@ -130,7 +129,7 @@ func NewCoinbase(value int64, to crypto.PubKey, sig crypto.Signature) (*Transact
 	txIn := TxInput{
 		TxID:  nil, // Empty ID
 		OutID: -1,  // No Reference
-		Sig:   sig,
+		Sig:   nil,
 	}
 	coinbase := &Transaction{
 		ID:      nil,
@@ -368,6 +367,7 @@ func (b *BlockChain) FindUTXO(pubKeyHash []byte) ([]TxOutput, error) {
 }
 
 func (b *BlockChain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
+	// Returns the balance of an account with pubKeyHash
 	utxos, err := b.FindUTXO(pubKeyHash)
 	if err != nil {
 		return -1, err
