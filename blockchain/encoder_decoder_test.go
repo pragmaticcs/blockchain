@@ -1,27 +1,40 @@
 package blockchain
 
-// func TestGobEncoderDecoder(t *testing.T) {
-// 	difficulty := 16
-// 	bch, err := NewBlockChain(difficulty)
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
+import (
+	"testing"
 
-// 	coinbase, err := NewCoinbase(1000000, []byte("my public key"), []byte("my signature"))
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// 	block := bch.AddBlock([]*Transaction{coinbase})
+	"github.com/pragmaticcs/blockchain/wallet"
+	"github.com/stretchr/testify/assert"
+)
 
-// 	encoderDecoder := GobEncoderDecoder{}
-// 	encoding, err := encoderDecoder.EncodeBlock(block)
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
+func TestGobEncoderDecoder(t *testing.T) {
+	handle := func(err error) {
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	wallets := &wallet.Wallets{
+		Wallets:      map[wallet.Address]*wallet.Wallet{},
+		SaveFilePath: "wallets.json",
+	}
+	bob, err := wallets.AddWallet()
+	handle(err)
+	bobsWallet, err := wallets.GetWallet(bob)
+	handle(err)
+	difficulty := 16
+	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
+	bch, err := NewBlockChain(difficulty, genesisConf, wallets)
+	handle(err)
 
-// 	decoding, err := encoderDecoder.DecodeBlock(encoding)
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-// 	assert.EqualValues(t, block, decoding)
-// }
+	coinbase, err := NewCoinbase(1000000, []byte("my public key"))
+	handle(err)
+	block := bch.AddBlock([]*Transaction{coinbase})
+
+	encoderDecoder := GobEncoderDecoder{}
+	encoding, err := encoderDecoder.EncodeBlock(block)
+	handle(err)
+
+	decoding, err := encoderDecoder.DecodeBlock(encoding)
+	handle(err)
+	assert.EqualValues(t, block, decoding)
+}

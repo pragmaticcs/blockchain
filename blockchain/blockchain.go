@@ -65,7 +65,7 @@ func (b *BlockChain) ToIterator() *BlockChainIterator {
 	}
 }
 
-func (b *BlockChainIterator) Backward() *Block {
+func (b *BlockChainIterator) Prev() *Block {
 	defer func() { b.CurrIndex -= 1 }()
 	if b.CurrIndex < 0 {
 		return nil

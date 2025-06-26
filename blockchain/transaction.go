@@ -72,6 +72,8 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets
 		return nil, err
 	}
 	tx.ID = txID
+	b.SignTransaction(tx, sender.PrivateKey)
+
 	return tx, nil
 }
 
@@ -257,7 +259,7 @@ func (b *BlockChain) FindUnspentTransactions(pubKeyHash []byte) ([]*Transaction,
 
 	blockchainIterator := b.ToIterator()
 	for {
-		block := blockchainIterator.Backward()
+		block := blockchainIterator.Prev()
 
 		if block == nil {
 			break
@@ -277,9 +279,10 @@ func (b *BlockChain) FindUnspentTransactions(pubKeyHash []byte) ([]*Transaction,
 				if ok {
 					// If transaction is in the set
 					// for each unspent transaction
-					for _, spentOut := range spentOutsIDs {
-						// Check if index of output in the array of outputs == its own index ???
-						if spentOut == i {
+					for _, spentOutID := range spentOutsIDs {
+						// Check if current txOut is already spent
+						if spentOutID == i {
+							// If it is spent -> continue with the next output
 							continue Outputs
 						}
 					}
@@ -294,7 +297,7 @@ func (b *BlockChain) FindUnspentTransactions(pubKeyHash []byte) ([]*Transaction,
 			if !tx.IsCoinbase() {
 				// For each input in the transaction's list of inputs
 				for _, in := range tx.Inputs {
-					// Check if the input is owned by the owner of pubkey
+					// Check if the input is owned by the owner of pubkeyHash
 					usesKey, err := in.UsesKey(pubKeyHash)
 					if err != nil {
 						return nil, err
@@ -314,7 +317,7 @@ func (b *BlockChain) FindUnspentTransactions(pubKeyHash []byte) ([]*Transaction,
 func (b *BlockChain) FindTransaction(id []byte) (*Transaction, error) {
 	iter := b.ToIterator()
 
-	for currBlock := iter.Backward(); currBlock != nil; currBlock = iter.Backward() {
+	for currBlock := iter.Prev(); currBlock != nil; currBlock = iter.Prev() {
 		for _, tx := range currBlock.Transactions {
 			if bytes.Equal(tx.ID, id) {
 				return tx, nil

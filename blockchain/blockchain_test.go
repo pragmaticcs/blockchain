@@ -9,7 +9,7 @@ import (
 func TestBlockChain(t *testing.T) {
 	handle := func(err error) {
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}
 	wallets := &wallet.Wallets{
