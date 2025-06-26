@@ -1,36 +1,12 @@
 package blockchain
 
 import (
-	"sync"
-
 	"github.com/pragmaticcs/blockchain/crypto"
-	"github.com/pragmaticcs/blockchain/wallet"
 )
 
 type BlockChain struct {
 	CurrDifficulty uint
 	Blocks         []*Block
-	Wallets        *wallet.Wallets
-
-	// Mutexes
-	selfLock    sync.RWMutex // Use when modifying the state of blockchain itself
-	accountLock sync.RWMutex // Use when modifying the state of accounts/wallets
-}
-
-func (b *BlockChain) Lock() {
-	b.selfLock.Lock()
-}
-
-func (b *BlockChain) Unlock() {
-	b.selfLock.Unlock()
-}
-
-func (b *BlockChain) LockAccounts() {
-	b.accountLock.Lock()
-}
-
-func (b *BlockChain) UnlockAccounts() {
-	b.accountLock.Unlock()
 }
 
 type GenesisConfig struct {
@@ -39,7 +15,7 @@ type GenesisConfig struct {
 	Sig    crypto.Signature
 }
 
-func NewBlockChain(difficulty int, genesisConfig GenesisConfig, wallets *wallet.Wallets) (*BlockChain, error) {
+func NewBlockChain(difficulty int, genesisConfig GenesisConfig) (*BlockChain, error) {
 	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.To)
 	if err != nil {
 		return nil, err
@@ -49,7 +25,6 @@ func NewBlockChain(difficulty int, genesisConfig GenesisConfig, wallets *wallet.
 		Blocks: []*Block{
 			genesis,
 		},
-		Wallets: wallets,
 	}, nil
 }
 
@@ -88,17 +63,4 @@ func (b *BlockChain) AddBlock(transactions []*Transaction) *Block {
 	b.Blocks = append(b.Blocks, block)
 
 	return block
-}
-
-func (b *BlockChain) GetBalance(addr wallet.Address) (int, error) {
-	wallet, err := b.Wallets.GetWallet(addr)
-	if err != nil {
-		return -1, err
-	}
-	pubKeyHash, err := crypto.HashPublicKey(wallet.PublicKey)
-	if err != nil {
-		return -1, err
-	}
-	return b.FindSpendableAmount(pubKeyHash)
-
 }

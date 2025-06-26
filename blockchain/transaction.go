@@ -72,8 +72,10 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets
 		return nil, err
 	}
 	tx.ID = txID
-	b.SignTransaction(tx, sender.PrivateKey)
-
+	err = b.SignTransaction(tx, sender.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
 	return tx, nil
 }
 
@@ -152,6 +154,7 @@ func (t *Transaction) IsCoinbase() bool {
 }
 
 func (out *TxOutput) IsLockedWithKey(pubkeyHash []byte) bool {
+
 	return bytes.Equal(out.PubKeyHash, pubkeyHash)
 }
 
@@ -169,6 +172,31 @@ func LockOutput(out *TxOutput, address []byte) {
 	out.PubKeyHash = pubkeyHash
 }
 
+func (tx *Transaction) Copy() Transaction {
+	var inputs []TxInput
+	var outputs []TxOutput
+	for _, in := range tx.Inputs {
+		inputs = append(inputs, TxInput{
+			TxID:   in.TxID,
+			OutID:  in.OutID,
+			Sig:    in.Sig,
+			PubKey: in.PubKey,
+		})
+	}
+
+	for _, out := range tx.Outputs {
+		outputs = append(outputs, TxOutput{
+			Value:      out.Value,
+			PubKeyHash: out.PubKeyHash,
+		})
+	}
+	return Transaction{
+		ID:      tx.ID,
+		Inputs:  inputs,
+		Outputs: outputs,
+	}
+}
+
 func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTxs map[string]Transaction) error {
 	if tx.IsCoinbase() {
 		return NewTransactionError("coinbase can't be signed")
@@ -180,12 +208,13 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTxs map[string]Transac
 			return NewTransactionError("previous transaction doesn't exist")
 		}
 	}
-	txCopy := *tx
+	txCopy := tx.Copy()
 
-	for id, in := range txCopy.Inputs {
+	for id, in := range tx.Inputs {
 		prevTx := prevTxs[hex.EncodeToString(in.TxID)]
 		txCopy.Inputs[id].Sig = nil
 		txCopy.Inputs[id].PubKey = prevTx.Outputs[in.OutID].PubKeyHash
+
 		txID, err := txCopy.GetHash()
 		if err != nil {
 			return err

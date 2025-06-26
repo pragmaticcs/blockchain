@@ -28,14 +28,15 @@ func main() {
 	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
 	difficulty := 22
-	bch, err := blockchain.NewBlockChain(difficulty, genesisConf, wallets)
+	bch, err := blockchain.NewBlockChain(difficulty, genesisConf)
 	handle(err)
+	stateManager := blockchain.NewStateManager(bch, wallets)
 
-	bobBalance, err := bch.GetBalance(bob)
+	bobBalance, err := stateManager.GetBalance(bob)
 	handle(err)
 	fmt.Printf("Bob's balance = %d\n", bobBalance)
 
-	aliceBalance, err := bch.GetBalance(alice)
+	aliceBalance, err := stateManager.GetBalance(alice)
 	handle(err)
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 
@@ -45,11 +46,11 @@ func main() {
 	bch.AddBlock([]*blockchain.Transaction{firstTx})
 	fmt.Println("Mining new block with transaction")
 
-	bobBalance, err = bch.GetBalance(bob)
+	bobBalance, err = stateManager.GetBalance(bob)
 	handle(err)
 	fmt.Printf("Bob's balance = %d\n", bobBalance)
 
-	aliceBalance, err = bch.GetBalance(alice)
+	aliceBalance, err = stateManager.GetBalance(alice)
 	handle(err)
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 }

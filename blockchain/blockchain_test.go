@@ -26,14 +26,16 @@ func TestBlockChain(t *testing.T) {
 	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
 	difficulty := 20
-	bch, err := NewBlockChain(difficulty, genesisConf, wallets)
+	bch, err := NewBlockChain(difficulty, genesisConf)
 	handle(err)
 
-	bobBalance, err := bch.GetBalance(bob)
+	stateManager := NewStateManager(bch, wallets)
+
+	bobBalance, err := stateManager.GetBalance(bob)
 	handle(err)
 	t.Logf("Bob's balance = %d\n", bobBalance)
 
-	aliceBalance, err := bch.GetBalance(alice)
+	aliceBalance, err := stateManager.GetBalance(alice)
 	handle(err)
 	t.Logf("Alice's balance = %d\n", aliceBalance)
 
@@ -43,11 +45,11 @@ func TestBlockChain(t *testing.T) {
 	bch.AddBlock([]*Transaction{firstTx})
 	t.Log("Mining new block with transaction\n")
 
-	bobBalance, err = bch.GetBalance(bob)
+	bobBalance, err = stateManager.GetBalance(bob)
 	handle(err)
 	t.Logf("Bob's balance = %d\n", bobBalance)
 
-	aliceBalance, err = bch.GetBalance(alice)
+	aliceBalance, err = stateManager.GetBalance(alice)
 	handle(err)
 	t.Logf("Alice's balance = %d\n", aliceBalance)
 }
