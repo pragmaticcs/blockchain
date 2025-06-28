@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	blockchain "github.com/pragmaticcs/blockchain/core"
+	"github.com/pragmaticcs/blockchain/blockchain"
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 

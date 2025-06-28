@@ -10,5 +10,6 @@ type Command struct {
 type Store interface {
 	PutBlock(*blockchain.Block) error
 	GetBlock([]byte) *blockchain.Block
-	GetCurrentBlock() ([]byte, error)
+	GetCurrentBlock() (*blockchain.Block, error)
+	ForEachBlock()
 }
