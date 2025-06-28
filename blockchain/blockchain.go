@@ -41,6 +41,7 @@ func (b *BlockChain) ToIterator() *BlockChainIterator {
 }
 
 func (b *BlockChainIterator) Prev() *Block {
+	// Goes from the most recent block to the genesis block
 	defer func() { b.CurrIndex -= 1 }()
 	if b.CurrIndex < 0 {
 		return nil

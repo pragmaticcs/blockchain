@@ -1,5 +1,5 @@
 package blockchain
 
-// type UTXOset {
-
-// }
+type UTXOset struct {
+	Blockchain *BlockChain
+}

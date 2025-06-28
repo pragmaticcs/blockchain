@@ -10,12 +10,10 @@ import (
 )
 
 type BlockHeader struct {
-	// Version    uint32
 	Hash     []byte // 32 bytes
 	PrevHash []byte // 32 bytes
 	// MerkelRoot [32]byte
 	// Time       time.Time // ???
-	// Bits  int32
 	Nonce int32
 }
 

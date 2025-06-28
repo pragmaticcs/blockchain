@@ -79,16 +79,6 @@ func (t *Transaction) GetHash() [32]byte {
 	return hash
 }
 
-// func (t *Transaction) GetData() ([]byte, error) {
-// 	var b []byte
-// 	buf := bytes.NewBuffer(b)
-// 	encoder := gob.NewEncoder(buf)
-// 	if err := encoder.Encode(*t); err != nil {
-// 		return nil, err
-// 	}
-// 	return buf.Bytes(), nil
-// }
-
 func (t *Transaction) GetData() []byte {
 	var outData []byte
 	for _, out := range t.Outputs {
