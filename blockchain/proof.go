@@ -28,8 +28,8 @@ func (p *POW) GetData(nonce int32) []byte {
 	// Converts POW to bytes
 	return bytes.Join([][]byte{
 		p.Block.GetData(),
-		GetHexValue(nonce),
-		GetHexValue(int32(p.Difficulty)),
+		GetHexValue(int64(nonce)),
+		GetHexValue(int64(p.Difficulty)),
 	}, []byte{})
 }
 

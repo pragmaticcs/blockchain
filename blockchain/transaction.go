@@ -6,7 +6,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/gob"
 	"fmt"
 
 	"github.com/pragmaticcs/blockchain/crypto"
@@ -63,10 +62,7 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets
 		Outputs: outputs,
 		Inputs:  inputs,
 	}
-	txID, err := tx.GetHash()
-	if err != nil {
-		return nil, err
-	}
+	txID := tx.GetHash()
 	tx.ID = txID
 	err = b.SignTransaction(tx, sender.PrivateKey)
 	if err != nil {
@@ -75,30 +71,50 @@ func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets
 	return tx, nil
 }
 
-func (t *Transaction) GetHash() ([32]byte, error) {
+func (t *Transaction) GetHash() [32]byte {
 	tx := *t
 	tx.ID = [32]byte{}
-	data, err := tx.GetData()
-	if err != nil {
-		return [32]byte{}, err
-	}
+	data := tx.GetData()
 	hash := sha256.Sum256(data)
-	return hash, nil
+	return hash
 }
 
-func (t *Transaction) GetData() ([]byte, error) {
-	var b []byte
-	buf := bytes.NewBuffer(b)
-	encoder := gob.NewEncoder(buf)
-	if err := encoder.Encode(*t); err != nil {
-		return nil, err
+// func (t *Transaction) GetData() ([]byte, error) {
+// 	var b []byte
+// 	buf := bytes.NewBuffer(b)
+// 	encoder := gob.NewEncoder(buf)
+// 	if err := encoder.Encode(*t); err != nil {
+// 		return nil, err
+// 	}
+// 	return buf.Bytes(), nil
+// }
+
+func (t *Transaction) GetData() []byte {
+	var outData []byte
+	for _, out := range t.Outputs {
+		outData = append(outData, out.GetData()...)
 	}
-	return buf.Bytes(), nil
+	var inData []byte
+	for _, in := range t.Inputs {
+		inData = append(inData, in.GetData()...)
+	}
+	return bytes.Join([][]byte{
+		t.ID[:],
+		outData,
+		inData,
+	}, []byte{})
 }
 
 type TxOutput struct {
 	Value      int64 // Amount of coins
 	PubKeyHash []byte
+}
+
+func (out *TxOutput) GetData() []byte {
+	return bytes.Join([][]byte{
+		GetHexValue(out.Value),
+		out.PubKeyHash,
+	}, []byte{})
 }
 
 func NewTxOutput(value int, address []byte) *TxOutput {
@@ -115,6 +131,15 @@ type TxInput struct {
 	OutID  int           // Points to the index of Tx in the list of Tx's inside the Transaction [ID]
 	Sig    crypto.Signature
 	PubKey crypto.PubKey
+}
+
+func (in *TxInput) GetData() []byte {
+	return bytes.Join([][]byte{
+		in.TxID[:],
+		GetHexValue(int64(in.OutID)),
+		in.Sig,
+		in.PubKey,
+	}, []byte{})
 }
 
 func NewCoinbase(value int64, to crypto.PubKey) (*Transaction, error) {
@@ -136,11 +161,7 @@ func NewCoinbase(value int64, to crypto.PubKey) (*Transaction, error) {
 		Inputs:  []TxInput{txIn},
 		Outputs: []TxOutput{txOut},
 	}
-	id, err := coinbase.GetHash()
-	if err != nil {
-		return nil, err
-	}
-	coinbase.ID = id
+	coinbase.ID = coinbase.GetHash()
 	return coinbase, nil
 }
 
@@ -211,10 +232,7 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTxs map[TransactionID]
 		txCopy.Inputs[id].Sig = nil
 		txCopy.Inputs[id].PubKey = prevTx.Outputs[in.OutID].PubKeyHash
 
-		txID, err := txCopy.GetHash()
-		if err != nil {
-			return err
-		}
+		txID := txCopy.GetHash()
 
 		r, s, err := ecdsa.Sign(rand.Reader, &privKey, txID[:])
 		if err != nil {
@@ -245,10 +263,7 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 		prevTx := prevTxs[in.TxID]
 		txCopy.Inputs[id].Sig = nil
 		txCopy.Inputs[id].PubKey = prevTx.Outputs[in.OutID].PubKeyHash
-		txID, err := txCopy.GetHash()
-		if err != nil {
-			return false, err
-		}
+		txID := txCopy.GetHash()
 
 		r, s := crypto.DeserializeEllipticCoordinates(in.Sig)
 		x, y := crypto.DeserializeEllipticCoordinates(in.PubKey)
@@ -322,7 +337,7 @@ func (b *BlockChain) FindTransaction(id TransactionID) (*Transaction, error) {
 
 	for currBlock := iter.Prev(); currBlock != nil; currBlock = iter.Prev() {
 		for _, tx := range currBlock.Transactions {
-			if bytes.Equal(tx.ID[:], id[:]) {
+			if tx.ID == id {
 				return tx, nil
 			}
 		}

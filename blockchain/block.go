@@ -70,7 +70,7 @@ func (b *Block) GetHash() []byte {
 	return hash[:]
 }
 
-func GetHexValue(i int32) []byte {
+func GetHexValue(i int64) []byte {
 	// Converting an integer into binary
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.BigEndian, i)
