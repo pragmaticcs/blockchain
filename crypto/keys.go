@@ -17,8 +17,8 @@ func NewKeyPair() (ecdsa.PrivateKey, PubKey, error) {
 	if err != nil {
 		return ecdsa.PrivateKey{}, nil, err
 	}
-	x := privateKey.X.Bytes()
-	y := privateKey.Y.Bytes()
-	pubKey := append(x, y...)
+	x := privateKey.X
+	y := privateKey.Y
+	pubKey := append(x.Bytes(), y.Bytes()...) // A public key is the bytes of x followed by bytes of y
 	return *privateKey, pubKey, nil
 }

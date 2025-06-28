@@ -45,10 +45,10 @@ func NewBlock(prevHash []byte, transactions []*Transaction) *Block {
 
 func (b *Block) GetTransactionsData() []byte {
 	// Returns the hash of an array of IDs in the block
-	ids := [][]byte{}
+	var ids [][]byte
 
 	for _, tx := range b.Transactions {
-		ids = append(ids, tx.ID)
+		ids = append(ids, tx.ID[:])
 	}
 	flattenedIds := bytes.Join(ids, []byte{})
 	hash := sha256.Sum256(flattenedIds)

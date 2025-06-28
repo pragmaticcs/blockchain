@@ -41,6 +41,12 @@ func main() {
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 
 	firstTx, err := bch.NewTransaction(bob, alice, 10, wallets)
+	handle(err)
+	verified, err := bch.VerifyTransaction(firstTx)
+	handle(err)
+	if verified {
+		fmt.Println("Verified transaction")
+	}
 
 	handle(err)
 	bch.AddBlock([]*blockchain.Transaction{firstTx})
