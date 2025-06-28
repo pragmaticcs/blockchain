@@ -19,6 +19,6 @@ func NewKeyPair() (ecdsa.PrivateKey, PubKey, error) {
 	}
 	x := privateKey.X
 	y := privateKey.Y
-	pubKey := append(x.Bytes(), y.Bytes()...) // A public key is the bytes of x followed by bytes of y
+	pubKey := SerializeEllipticCoordinates(x, y)
 	return *privateKey, pubKey, nil
 }

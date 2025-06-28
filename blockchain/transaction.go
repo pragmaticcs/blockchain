@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
-	"math/big"
 
 	"github.com/pragmaticcs/blockchain/crypto"
 	"github.com/pragmaticcs/blockchain/wallet"
@@ -221,7 +220,7 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTxs map[TransactionID]
 		if err != nil {
 			return err
 		}
-		sig := append(r.Bytes(), s.Bytes()...)
+		sig := crypto.SerializeEllipticCoordinates(r, s)
 
 		tx.Inputs[id].Sig = sig
 	}
@@ -251,28 +250,12 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 			return false, err
 		}
 
-		var r big.Int
-		var s big.Int
-		sigLen := len(in.Sig)
-		rFromSig := in.Sig[:sigLen/2]
-		sFromSig := in.Sig[sigLen/2:]
+		r, s := crypto.DeserializeEllipticCoordinates(in.Sig)
+		x, y := crypto.DeserializeEllipticCoordinates(in.PubKey)
 
-		r.SetBytes(rFromSig)
-		s.SetBytes(sFromSig)
+		ecdsaPubKey := ecdsa.PublicKey{Curve: curve, X: x, Y: y}
 
-		var x big.Int
-		var y big.Int
-
-		keyLen := len(in.PubKey)
-		xFromSig := in.PubKey[:keyLen/2]
-		yFromSig := in.PubKey[keyLen/2:]
-
-		x.SetBytes(xFromSig)
-		y.SetBytes(yFromSig)
-
-		ecdsaPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
-
-		if !ecdsa.Verify(&ecdsaPubKey, txID[:], &r, &s) {
+		if !ecdsa.Verify(&ecdsaPubKey, txID[:], r, s) {
 			return false, nil
 		}
 	}
