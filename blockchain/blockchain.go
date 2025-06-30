@@ -65,3 +65,29 @@ func (b *BlockChain) AddBlock(transactions []*Transaction) *Block {
 
 	return block
 }
+
+// NEW Version that uses a store
+type Blockchain struct {
+	Store          Store
+	Head           BlockHash
+	CurrDifficulty uint
+}
+
+func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
+	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.To)
+	if err != nil {
+		return nil, err
+	}
+	store.PutBlock(genesis)
+	return &Blockchain{
+		Store:          store,
+		Head:           genesis.GetHash(),
+		CurrDifficulty: uint(difficulty),
+	}, nil
+}
+
+// Implements the types.iterator interface
+type BlockchainIterator struct {
+	CurrHash BlockHash
+	Store    Store
+}

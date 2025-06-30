@@ -15,6 +15,7 @@ func handle(err error) {
 }
 
 func main() {
+
 	wallets, err := wallet.InitWallets("wallets.json")
 	handle(err)
 

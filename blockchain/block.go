@@ -9,9 +9,11 @@ import (
 	"github.com/pragmaticcs/blockchain/crypto"
 )
 
+type BlockHash []byte
+
 type BlockHeader struct {
-	Hash     []byte // 32 bytes
-	PrevHash []byte // 32 bytes
+	Hash     BlockHash // 32 bytes
+	PrevHash BlockHash // 32 bytes
 	// MerkelRoot [32]byte
 	// Time       time.Time // ???
 	Nonce int32
