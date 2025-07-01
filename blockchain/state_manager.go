@@ -8,7 +8,7 @@ import (
 )
 
 type StateManager struct {
-	Blockchain *BlockChain
+	Blockchain *Blockchain
 	Wallets    *wallet.Wallets
 
 	// Mutexes
@@ -16,7 +16,7 @@ type StateManager struct {
 	accountLock sync.RWMutex // Use when modifying the state of accounts/wallets
 }
 
-func NewStateManager(b *BlockChain, w *wallet.Wallets) *StateManager {
+func NewStateManager(b *Blockchain, w *wallet.Wallets) *StateManager {
 	return &StateManager{
 		Blockchain:  b,
 		Wallets:     w,

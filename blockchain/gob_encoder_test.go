@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pragmaticcs/blockchain/wallet"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestGobEncoderDecoder(t *testing.T) {
+	tempDir := t.TempDir()
 	handle := func(err error) {
 		if err != nil {
 			t.Error(err)
@@ -23,12 +25,16 @@ func TestGobEncoderDecoder(t *testing.T) {
 	handle(err)
 	difficulty := 16
 	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
-	bch, err := NewBlockChain(difficulty, genesisConf)
+
+	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir), &GobBlockEncoder{})
+	handle(err)
+	bch, err := NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
 	handle(err)
-	block := bch.AddBlock([]*Transaction{coinbase})
+	block, err := bch.AddBlock([]*Transaction{coinbase})
+	handle(err)
 
 	gobEncoder := GobBlockEncoder{}
 	encoding, err := gobEncoder.Encode(block)

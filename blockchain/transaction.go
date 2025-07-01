@@ -22,7 +22,7 @@ type Transaction struct {
 	Outputs []TxOutput
 }
 
-func (b *BlockChain) NewTransaction(from, to wallet.Address, amount int, wallets *wallet.Wallets) (*Transaction, error) {
+func (b *Blockchain) NewTransaction(from, to wallet.Address, amount int, wallets *wallet.Wallets) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -271,15 +271,15 @@ type UTXO map[TransactionID][]TxOutput
 
 // UTXO is a map of txID <==> list of unspent outputs
 
-func (b *BlockChain) FindUtxoSet() (UTXO, error) {
+func (b *Blockchain) FindUtxoSet() (UTXO, error) {
 	UTXO := make(UTXO)
 	spentTXOs := make(map[TransactionID][]int)
 
 	blockchainIterator := b.ToIterator()
 	for {
-		block := blockchainIterator.Prev()
+		block, ok := blockchainIterator.Next()
 
-		if block == nil {
+		if !ok {
 			break
 		}
 
@@ -322,10 +322,10 @@ func (b *BlockChain) FindUtxoSet() (UTXO, error) {
 	return UTXO, nil
 }
 
-func (b *BlockChain) FindTransaction(id TransactionID) (*Transaction, error) {
+func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
 	iter := b.ToIterator()
 
-	for currBlock := iter.Prev(); currBlock != nil; currBlock = iter.Prev() {
+	for currBlock, ok := iter.Next(); ok; {
 		for _, tx := range currBlock.Transactions {
 			if tx.ID == id {
 				return tx, nil
@@ -335,7 +335,7 @@ func (b *BlockChain) FindTransaction(id TransactionID) (*Transaction, error) {
 	return nil, NewTransactionError("transaction doesn't exist")
 }
 
-func (b *BlockChain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) error {
+func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) error {
 	prevTxs := make(map[TransactionID]Transaction)
 
 	for _, in := range tx.Inputs {
@@ -348,7 +348,7 @@ func (b *BlockChain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKe
 	return tx.Sign(privateKey, prevTxs)
 }
 
-func (b *BlockChain) VerifyTransaction(tx *Transaction) (bool, error) {
+func (b *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
 	prevTxs := make(map[TransactionID]Transaction)
 
 	for _, in := range tx.Inputs {
@@ -361,7 +361,7 @@ func (b *BlockChain) VerifyTransaction(tx *Transaction) (bool, error) {
 	return tx.Verify(prevTxs)
 }
 
-func (b *BlockChain) FindUtxos(pubKeyHash []byte) ([]TxOutput, error) {
+func (b *Blockchain) FindUtxos(pubKeyHash []byte) ([]TxOutput, error) {
 	var utxos []TxOutput
 	utxoSet, err := b.FindUtxoSet()
 	if err != nil {
@@ -377,7 +377,7 @@ func (b *BlockChain) FindUtxos(pubKeyHash []byte) ([]TxOutput, error) {
 	return utxos, nil
 }
 
-func (b *BlockChain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
+func (b *Blockchain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
 	// Returns the balance of an account with pubKeyHash
 	utxos, err := b.FindUtxos(pubKeyHash)
 	if err != nil {
@@ -390,7 +390,7 @@ func (b *BlockChain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
 	return int(balance), nil
 }
 
-func (b *BlockChain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, map[TransactionID][]int, error) {
+func (b *Blockchain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, map[TransactionID][]int, error) {
 	// Returns a hash map of transaction id / array of indexes of outputs
 	utxoSet, err := b.FindUtxoSet()
 	spendableOuts := make(map[TransactionID][]int)

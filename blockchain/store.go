@@ -9,5 +9,5 @@ type Store interface {
 	// GetUTXO(txID TransactionID) ([]TxOutput, error)
 	// DeleteUTXO(txID TransactionID) error
 
-	Close()
+	Close() error
 }

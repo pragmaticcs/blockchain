@@ -1,12 +1,14 @@
 package blockchain
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
 func TestBlockChain(t *testing.T) {
+	tempDir := t.TempDir()
 	handle := func(err error) {
 		if err != nil {
 			t.Error(err)
@@ -26,7 +28,10 @@ func TestBlockChain(t *testing.T) {
 	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
 	difficulty := 20
-	bch, err := NewBlockChain(difficulty, genesisConf)
+	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir), &GobBlockEncoder{})
+	handle(err)
+
+	bch, err := NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 
 	stateManager := NewStateManager(bch, wallets)

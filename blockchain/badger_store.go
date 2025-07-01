@@ -2,7 +2,7 @@ package blockchain
 
 import (
 	"github.com/pragmaticcs/blockchain/types"
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v4"
 )
 
 var (
@@ -17,7 +17,7 @@ type BadgerStore struct {
 }
 
 func NewBadgerStore(path string, encoder BlockEncoder) (*BadgerStore, error) {
-	opts := badger.DefaultOptions(path)
+	opts := badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR)
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (b *BadgerStore) GetBlock(hash BlockHash) (*Block, error) {
 		if err != nil {
 			return err
 		}
-		_, err = item.ValueCopy(value)
+		value, err = item.ValueCopy(value)
 		return err
 	})
 	if err != nil {

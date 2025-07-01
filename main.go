@@ -28,8 +28,10 @@ func main() {
 	handle(err)
 	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
+	store, err := blockchain.NewBadgerStore("badger", &blockchain.GobBlockEncoder{})
+	handle(err)
 	difficulty := 22
-	bch, err := blockchain.NewBlockChain(difficulty, genesisConf)
+	bch, err := blockchain.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 	stateManager := blockchain.NewStateManager(bch, wallets)
 
@@ -60,4 +62,6 @@ func main() {
 	aliceBalance, err = stateManager.GetBalance(alice)
 	handle(err)
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
+
+	store.Close()
 }
