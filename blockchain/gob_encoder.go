@@ -12,7 +12,7 @@ func (enc *GobBlockEncoder) Encode(block *Block) ([]byte, error) {
 	var b []byte
 	buf := bytes.NewBuffer(b)
 	encoder := gob.NewEncoder(buf)
-	err := encoder.Encode(block)
+	err := encoder.Encode(*block)
 	if err != nil {
 		return nil, err
 	}
@@ -20,12 +20,12 @@ func (enc *GobBlockEncoder) Encode(block *Block) ([]byte, error) {
 }
 
 func (enc *GobBlockEncoder) Decode(data []byte) (*Block, error) {
-	var block *Block
+	var block Block
 	buf := bytes.NewBuffer(data)
 	decoder := gob.NewDecoder(buf)
-	err := decoder.Decode(block)
+	err := decoder.Decode(&block)
 	if err != nil {
 		return nil, err
 	}
-	return block, nil
+	return &block, nil
 }

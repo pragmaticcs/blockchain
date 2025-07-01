@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"github.com/pragmaticcs/blockchain/crypto"
+	"github.com/pragmaticcs/blockchain/types"
 )
 
 type BlockChain struct {
@@ -59,7 +60,7 @@ func (b *BlockChain) AddBlock(transactions []*Transaction) *Block {
 	pow := NewPOW(block, b.CurrDifficulty)
 	nonce, hash := pow.Run()
 	block.Nonce = nonce
-	copy(block.Hash[:], hash)
+	block.Hash = hash
 
 	b.Blocks = append(b.Blocks, block)
 
@@ -90,4 +91,35 @@ func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*B
 type BlockchainIterator struct {
 	CurrHash BlockHash
 	Store    Store
+}
+
+func (b *BlockchainIterator) Next() (*Block, bool) {
+	currBlock, err := b.Store.GetBlock(b.CurrHash)
+	if err != nil {
+		return nil, false
+	}
+	b.CurrHash = currBlock.PrevHash
+	return currBlock, true
+}
+
+func (b *BlockchainIterator) Close() {
+	// Currently doesn't do anything
+}
+
+func (b *Blockchain) ToBlockIterator() types.Iterator[*Block] {
+	return &BlockchainIterator{
+		CurrHash: b.Head,
+		Store:    b.Store,
+	}
+}
+
+func (b *Blockchain) AddBlock(transactions []*Transaction) *Block {
+	block := NewBlock(b.Head, transactions)
+	b.Store.PutBlock(block)
+	pow := NewPOW(block, b.CurrDifficulty)
+	nonce, hash := pow.Run()
+	block.Nonce = nonce
+	block.Hash = hash
+	b.Head = block.Hash
+	return block
 }

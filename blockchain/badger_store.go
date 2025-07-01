@@ -44,6 +44,16 @@ func (b *BadgerStore) GetBlock(hash BlockHash) (*Block, error) {
 	return b.Encoder.Decode(value)
 }
 
+func (b *BadgerStore) PutBlock(block *Block) error {
+	value, err := b.Encoder.Encode(block)
+	if err != nil {
+		return err
+	}
+	return b.DB.Update(func(txn *badger.Txn) error {
+		return txn.Set(block.Hash, value)
+	})
+}
+
 func (b *BadgerStore) Close() error {
 	return b.DB.Close()
 }
