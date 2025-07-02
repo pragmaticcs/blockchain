@@ -26,8 +26,9 @@ func TestGobEncoderDecoder(t *testing.T) {
 	difficulty := 16
 	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
-	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir), &GobBlockEncoder{})
+	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir))
 	handle(err)
+	defer store.Close()
 	bch, err := NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 
@@ -36,11 +37,12 @@ func TestGobEncoderDecoder(t *testing.T) {
 	block, err := bch.AddBlock([]*Transaction{coinbase})
 	handle(err)
 
-	gobEncoder := GobBlockEncoder{}
+	gobEncoder := GobEncoder[Block]{}
 	encoding, err := gobEncoder.Encode(block)
 	handle(err)
 
 	decoding, err := gobEncoder.Decode(encoding)
 	handle(err)
 	assert.EqualValues(t, block, decoding)
+
 }

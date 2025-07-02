@@ -36,7 +36,7 @@ func TestWalletsFile(t *testing.T) {
 		Wallets:      walletSet,
 		SaveFilePath: fmt.Sprintf("%s/wallets.json", temp_dir),
 	}
-	err := wallets.SaveWalletsToFile()
+	err := wallets.SaveToFile()
 	if err != nil {
 		t.Error(err)
 	}

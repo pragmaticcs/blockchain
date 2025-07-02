@@ -1,13 +1,16 @@
 package blockchain
 
 type Store interface {
+	// Block operations
+	// Don't need a delete/update block method cause
+	// a blockchain is immutable by design
 	PutBlock(block *Block) error
 	GetBlock(hash BlockHash) (*Block, error)
 
-	// // UTXO operations
-	// PutUTXO(txID TransactionID, outs []TxOutput) error
-	// GetUTXO(txID TransactionID) ([]TxOutput, error)
-	// DeleteUTXO(txID TransactionID) error
+	// UTXO operations
+	PutUTXO(txID TransactionID, utxo *TxOutputs) error
+	GetUTXO(txID TransactionID) (*TxOutputs, error)
+	DeleteUTXO(txID TransactionID) error
 
 	Close() error
 }

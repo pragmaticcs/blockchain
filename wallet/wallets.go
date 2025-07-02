@@ -36,18 +36,17 @@ func (w *Wallets) GetAllAddresses() []Address {
 
 func InitWallets(saveFilePath string) (*Wallets, error) {
 	wallets, err := LoadWalletsFromFile(saveFilePath)
-	if os.IsNotExist(err) {
+	if wallets == nil {
 		// If the file doesn't exist - return empty struct
 		wallets = &Wallets{
 			Wallets:      map[Address]*Wallet{},
 			SaveFilePath: saveFilePath,
 		}
-		err = nil
 	}
 	return wallets, err
 }
 
-func (w *Wallets) SaveWalletsToFile() error {
+func (w *Wallets) SaveToFile() error {
 	var b []byte
 	buf := bytes.NewBuffer(b)
 	encoder := json.NewEncoder(buf)
@@ -59,7 +58,7 @@ func (w *Wallets) SaveWalletsToFile() error {
 
 func LoadWalletsFromFile(saveFilePath string) (*Wallets, error) {
 	if _, err := os.Stat(saveFilePath); os.IsNotExist(err) {
-		return nil, err
+		return nil, nil
 	}
 	fileBytes, err := os.ReadFile(saveFilePath)
 	if err != nil {

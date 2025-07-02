@@ -9,7 +9,7 @@ import (
 	"github.com/pragmaticcs/blockchain/crypto"
 )
 
-type BlockHash []byte
+type BlockHash = []byte
 
 type BlockHeader struct {
 	Hash     BlockHash // 32 bytes
@@ -26,7 +26,7 @@ type BlockBody struct {
 type Block struct {
 	// BlockSize int32
 	BlockHeader
-	BlockBody // Data of the Block (Transactions in the future)
+	BlockBody
 }
 
 func NewBlock(prevHash []byte, transactions []*Transaction) *Block {

@@ -28,7 +28,7 @@ func TestBlockChain(t *testing.T) {
 	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
 	difficulty := 20
-	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir), &GobBlockEncoder{})
+	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir))
 	handle(err)
 
 	bch, err := NewBlockchain(difficulty, genesisConf, store)

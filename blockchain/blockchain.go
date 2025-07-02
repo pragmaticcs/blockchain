@@ -64,10 +64,8 @@ func (b *Blockchain) AddBlock(transactions []*Transaction) (*Block, error) {
 	// Run the proof of work
 	pow := NewPOW(block, b.CurrDifficulty)
 
-	nonce, hash := pow.Run()
-	block.Nonce = nonce
-	block.Hash = hash
-	b.Head = hash
+	block.Nonce, block.Hash = pow.Run()
+	b.Head = block.Hash
 
 	// Add the mined block to the store
 	err := b.Store.PutBlock(block)

@@ -5,27 +5,27 @@ import (
 	"encoding/gob"
 )
 
-type GobBlockEncoder struct {
+type GobEncoder[T any] struct {
 }
 
-func (enc *GobBlockEncoder) Encode(block *Block) ([]byte, error) {
+func (enc GobEncoder[T]) Encode(obj *T) ([]byte, error) {
 	var b []byte
 	buf := bytes.NewBuffer(b)
 	encoder := gob.NewEncoder(buf)
-	err := encoder.Encode(*block)
+	err := encoder.Encode(*obj)
 	if err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
-func (enc *GobBlockEncoder) Decode(data []byte) (*Block, error) {
-	var block Block
+func (enc GobEncoder[T]) Decode(data []byte) (*T, error) {
+	var obj T
 	buf := bytes.NewBuffer(data)
 	decoder := gob.NewDecoder(buf)
-	err := decoder.Decode(&block)
+	err := decoder.Decode(&obj)
 	if err != nil {
 		return nil, err
 	}
-	return &block, nil
+	return &obj, nil
 }

@@ -15,7 +15,6 @@ func handle(err error) {
 }
 
 func main() {
-
 	wallets, err := wallet.InitWallets("wallets.json")
 	handle(err)
 
@@ -23,14 +22,18 @@ func main() {
 	handle(err)
 	alice, err := wallets.AddWallet()
 	handle(err)
+	// err = wallets.SaveToFile()
+	// handle(err)
 
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
 	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
 
-	store, err := blockchain.NewBadgerStore("badger", &blockchain.GobBlockEncoder{})
+	store, err := blockchain.NewBadgerStore("badger")
 	handle(err)
-	difficulty := 22
+	defer store.Close()
+
+	difficulty := 20
 	bch, err := blockchain.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 	stateManager := blockchain.NewStateManager(bch, wallets)
@@ -63,5 +66,4 @@ func main() {
 	handle(err)
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 
-	store.Close()
 }

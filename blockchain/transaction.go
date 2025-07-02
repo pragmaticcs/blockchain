@@ -267,12 +267,8 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 	return true, nil
 }
 
-type UTXO map[TransactionID][]TxOutput
-
-// UTXO is a map of txID <==> list of unspent outputs
-
-func (b *Blockchain) FindUtxoSet() (UTXO, error) {
-	UTXO := make(UTXO)
+func (b *Blockchain) FindUtxoSet() (map[TransactionID][]TxOutput, error) {
+	UTXO := make(map[TransactionID][]TxOutput)
 	spentTXOs := make(map[TransactionID][]int)
 
 	blockchainIterator := b.ToIterator()
