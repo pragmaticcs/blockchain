@@ -30,21 +30,6 @@ func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*B
 	}, nil
 }
 
-func (b *Blockchain) ForEachBlock(fn func(block *Block) error) error {
-	currHash := b.Head
-	for currHash != nil {
-		block, err := b.Store.GetBlock(currHash)
-		if err != nil {
-			return err
-		}
-		if err := fn(block); err != nil {
-			return err
-		}
-		currHash = block.PrevHash
-	}
-	return nil
-}
-
 // Implements the types.iterator interface
 type BlockchainIterator struct {
 	CurrHash BlockHash

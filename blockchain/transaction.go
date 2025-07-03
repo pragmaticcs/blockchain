@@ -267,29 +267,25 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 	return true, nil
 }
 
-func (b *Blockchain) FindUtxoSet() (map[TransactionID][]TxOutput, error) {
-	UTXO := make(map[TransactionID][]TxOutput)
+func (b *Blockchain) FindUtxoSet() UTXOs {
+	UTXO := make(map[TransactionID]TxOutputs)
 	spentTXOs := make(map[TransactionID][]int)
 
-	blockchainIterator := b.ToIterator()
+	iterator := b.ToIterator()
+	defer iterator.Close()
 	for {
-		block, ok := blockchainIterator.Next()
-
+		block, ok := iterator.Next()
 		if !ok {
 			break
 		}
-
 		// For each transaction in a block
 		for _, tx := range block.Transactions {
-			// Get the txID in string form
-			txID := tx.ID
-
 			// OUTPUTS - collect all outputs of the transaction
 			// For each output in this transaction
 		Outputs:
 			for i, txOut := range tx.Outputs {
-				// Check if transaction is in the set of [tx <==> spent outputs in tx]
-				spentOutsIDs, ok := spentTXOs[txID]
+				// Check if transaction is in utxo set
+				spentOutsIDs, ok := spentTXOs[tx.ID]
 				if ok {
 					// If transaction is in the set
 					// for each unspent transaction
@@ -302,20 +298,23 @@ func (b *Blockchain) FindUtxoSet() (map[TransactionID][]TxOutput, error) {
 					}
 				}
 				// Check if the output is owned by the owner of pubkey
-				UTXO[txID] = append(UTXO[txID], txOut)
+				outs := UTXO[tx.ID]
+				outs.Outputs = append(UTXO[tx.ID].Outputs, txOut)
+				UTXO[tx.ID] = outs
 			}
 			// INPUTS - remove outputs that have already been spent
 			// Ignore coinbases
-			if !tx.IsCoinbase() {
+			if tx.IsCoinbase() {
+				continue
+			}
+			for _, in := range tx.Inputs {
 				// For each input in the transaction's list of inputs
-				for _, in := range tx.Inputs {
-					// Add the output the input uses to the set of spent outputs
-					spentTXOs[in.TxID] = append(spentTXOs[in.TxID], in.OutID)
-				}
+				// Add the output the input uses to the set of spent outputs
+				spentTXOs[in.TxID] = append(spentTXOs[in.TxID], in.OutID)
 			}
 		}
 	}
-	return UTXO, nil
+	return UTXO
 }
 
 func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
@@ -359,12 +358,9 @@ func (b *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
 
 func (b *Blockchain) FindUtxos(pubKeyHash []byte) ([]TxOutput, error) {
 	var utxos []TxOutput
-	utxoSet, err := b.FindUtxoSet()
-	if err != nil {
-		return nil, err
-	}
+	utxoSet := b.FindUtxoSet()
 	for _, outs := range utxoSet {
-		for _, out := range outs {
+		for _, out := range outs.Outputs {
 			if out.IsLockedWithKey(pubKeyHash) {
 				utxos = append(utxos, out)
 			}
@@ -388,15 +384,12 @@ func (b *Blockchain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
 
 func (b *Blockchain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, map[TransactionID][]int, error) {
 	// Returns a hash map of transaction id / array of indexes of outputs
-	utxoSet, err := b.FindUtxoSet()
+	utxoSet := b.FindUtxoSet()
 	spendableOuts := make(map[TransactionID][]int)
-	if err != nil {
-		return 0, nil, err
-	}
 	var currSum int64 = 0
 Outer:
 	for txID, utxos := range utxoSet {
-		for id, out := range utxos {
+		for id, out := range utxos.Outputs {
 			if out.IsLockedWithKey(pubKeyHash) && currSum < int64(amount) {
 				currSum += out.Value
 				spendableOuts[txID] = append(spendableOuts[txID], id)

@@ -113,16 +113,16 @@ func (b *BadgerStore) DeletePrefix(Prefix BadgerPrefix) error {
 	return b.DB.DropPrefix([]byte(Prefix.Prefix))
 }
 
-func (b *BadgerStore) PutUTXO(txID TransactionID, utxo *TxOutputs) error {
-	value, err := b.UtxoEncoder.Encode(utxo)
-	if err != nil {
-		return err
-	}
-	key := utxoPrefix.ConstructKey(txID[:])
-	return b.DB.Update(func(txn *badger.Txn) error {
-		return txn.Set(key, value)
-	})
-}
+// func (b *BadgerStore) PutUTXO(txID TransactionID, utxo *TxOutputs) error {
+// 	value, err := b.UtxoEncoder.Encode(utxo)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	key := utxoPrefix.ConstructKey(txID[:])
+// 	return b.DB.Update(func(txn *badger.Txn) error {
+// 		return txn.Set(key, value)
+// 	})
+// }
 
 func (b *BadgerStore) GetUTXO(txID TransactionID) (*TxOutputs, error) {
 	var value []byte
@@ -185,18 +185,18 @@ func (b *BadgerStore) ForEachUTXO(fn func(txID TransactionID, utxo *TxOutputs) e
 	})
 }
 
-func (b *BadgerStore) GetAllUTXOs() (UTXOs, error) {
-	allUtxos := make(UTXOs)
+// func (b *BadgerStore) GetAllUTXOs() (UTXOs, error) {
+// 	allUtxos := make(UTXOs)
 
-	err := b.ForEachUTXO(func(txID TransactionID, utxo *TxOutputs) error {
-		allUtxos[txID] = *utxo
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return allUtxos, nil
-}
+// 	err := b.ForEachUTXO(func(txID TransactionID, utxo *TxOutputs) error {
+// 		allUtxos[txID] = *utxo
+// 		return nil
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return allUtxos, nil
+// }
 
 func (b *BadgerStore) PutUTXOs(utxos UTXOs) error {
 	return b.DB.Update(func(txn *badger.Txn) error {

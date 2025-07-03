@@ -8,14 +8,18 @@ type Store interface {
 	GetBlock(hash BlockHash) (*Block, error)
 
 	// UTXO operations
-	PutUTXO(txID TransactionID, utxo *TxOutputs) error
+	// Create/Update
+	// PutUTXO(txID TransactionID, utxo *TxOutputs) error
+	// Read
 	GetUTXO(txID TransactionID) (*TxOutputs, error)
-	GetAllUTXOs() (UTXOs, error)
+	// GetAllUTXOs() (UTXOs, error)
+	// Delete
 	DeleteUTXO(txID TransactionID) error
+	DeleteAllUTXOs() error
 
 	// Batch UTXO operations
-	// PutUTXOs(UTXOs) error
-	// DeleteUTXOs(UTXOs) error
+	PutUTXOs(UTXOs) error
+	// DeleteUTXOs() error
 
 	Close() error
 }
