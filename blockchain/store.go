@@ -10,7 +10,12 @@ type Store interface {
 	// UTXO operations
 	PutUTXO(txID TransactionID, utxo *TxOutputs) error
 	GetUTXO(txID TransactionID) (*TxOutputs, error)
+	GetAllUTXOs() (UTXOs, error)
 	DeleteUTXO(txID TransactionID) error
+
+	// Batch UTXO operations
+	// PutUTXOs(UTXOs) error
+	// DeleteUTXOs(UTXOs) error
 
 	Close() error
 }

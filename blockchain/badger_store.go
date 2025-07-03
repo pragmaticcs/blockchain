@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"github.com/pragmaticcs/blockchain/types"
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -9,8 +8,16 @@ type BadgerPrefix struct {
 	Prefix string
 }
 
+func (b BadgerPrefix) Len() int {
+	return len(b.Prefix)
+}
+
 func (b BadgerPrefix) ConstructKey(key []byte) []byte {
 	return append([]byte(b.Prefix), key...)
+}
+
+func (b BadgerPrefix) DeconstructKey(key []byte) []byte {
+	return key[(b.Len() - 1):]
 }
 
 var (
@@ -66,6 +73,42 @@ func (b *BadgerStore) PutBlock(block *Block) error {
 	})
 }
 
+func (b *BadgerStore) ForEachBlock(fn func(block *Block) error) error {
+	return b.DB.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = []byte(blockPrefix.Prefix)
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+
+			var block *Block
+			err := item.Value(func(val []byte) error {
+				value, err := b.BlockEncoder.Decode(val)
+				if err != nil {
+					return err
+				}
+				block = value
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+
+			if err := fn(block); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (b *BadgerStore) DeleteAllUTXOs() error {
+	return b.DeletePrefix(utxoPrefix)
+}
+
 func (b *BadgerStore) DeletePrefix(Prefix BadgerPrefix) error {
 	return b.DB.DropPrefix([]byte(Prefix.Prefix))
 }
@@ -105,96 +148,70 @@ func (b *BadgerStore) DeleteUTXO(txID TransactionID) error {
 	})
 }
 
+func (b *BadgerStore) ForEachUTXO(fn func(txID TransactionID, utxo *TxOutputs) error) error {
+	return b.DB.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = []byte(utxoPrefix.Prefix)
+
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+
+			key := make([]byte, item.KeySize())
+			item.KeyCopy(key)
+			key = utxoPrefix.DeconstructKey(key)
+			txID := TransactionID(key)
+
+			var utxos *TxOutputs
+			err := item.Value(func(val []byte) error {
+				value, err := b.UtxoEncoder.Decode(val)
+				if err != nil {
+					return err
+				}
+				utxos = value
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+
+			if err := fn(txID, utxos); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (b *BadgerStore) GetAllUTXOs() (UTXOs, error) {
+	allUtxos := make(UTXOs)
+
+	err := b.ForEachUTXO(func(txID TransactionID, utxo *TxOutputs) error {
+		allUtxos[txID] = *utxo
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return allUtxos, nil
+}
+
+func (b *BadgerStore) PutUTXOs(utxos UTXOs) error {
+	return b.DB.Update(func(txn *badger.Txn) error {
+		for txID, utxo := range utxos {
+			key := utxoPrefix.ConstructKey(txID[:])
+			value, err := b.UtxoEncoder.Encode(&utxo)
+			if err != nil {
+				return err
+			}
+			txn.Set(key, value)
+		}
+		return nil
+	})
+}
+
 func (b *BadgerStore) Close() error {
 	return b.DB.Close()
-}
-
-type BadgerBlockIterator struct {
-	txn     *badger.Txn
-	it      *badger.Iterator
-	encoder BlockEncoder
-}
-
-func (it *BadgerBlockIterator) Next() (*Block, bool) {
-	if !it.it.Valid() {
-		return nil, false
-	}
-
-	var block *Block
-	item := it.it.Item()
-	err := item.Value(func(val []byte) error {
-		b, err := it.encoder.Decode(val)
-		if err != nil {
-			return err
-		}
-		block = b
-		return nil
-	})
-	if err != nil {
-		// TODO: handle this error better
-		return nil, false
-	}
-	it.it.Next()
-	return block, true
-}
-
-func (it *BadgerBlockIterator) Close() {
-	it.it.Close()
-}
-
-func (s *BadgerStore) ToBlockIterator() types.Iterator[*Block] {
-	txn := s.DB.NewTransaction(false)
-	opts := badger.DefaultIteratorOptions
-	opts.PrefetchValues = false
-	opts.Prefix = []byte(blockPrefix.Prefix)
-
-	it := txn.NewIterator(opts)
-	it.Rewind()
-
-	return &BadgerBlockIterator{txn: txn, it: it}
-}
-
-type BadgerUtxosIterator struct {
-	txn     *badger.Txn
-	it      *badger.Iterator
-	encoder UtxoEncoder
-}
-
-func (it *BadgerUtxosIterator) Next() (*TxOutputs, bool) {
-	if !it.it.Valid() {
-		return nil, false
-	}
-
-	var utxos *TxOutputs
-	item := it.it.Item()
-	err := item.Value(func(val []byte) error {
-		value, err := it.encoder.Decode(val)
-		if err != nil {
-			return err
-		}
-		utxos = value
-		return nil
-	})
-	if err != nil {
-		// TODO: handle this error better
-		return nil, false
-	}
-	it.it.Next()
-	return utxos, true
-}
-
-func (it *BadgerUtxosIterator) Close() {
-	it.it.Close()
-}
-
-func (s *BadgerStore) ToUtxoIterator() types.Iterator[*TxOutputs] {
-	txn := s.DB.NewTransaction(false)
-	opts := badger.DefaultIteratorOptions
-	opts.PrefetchValues = false
-	opts.Prefix = []byte(utxoPrefix.Prefix)
-
-	it := txn.NewIterator(opts)
-	it.Rewind()
-
-	return &BadgerUtxosIterator{txn: txn, it: it}
 }
