@@ -66,7 +66,7 @@ func (u *UTXOset) Unlock() {
 }
 
 func (u *UTXOset) Reindex() error {
-	utxos := u.Blockchain.FindUtxoSet()
+	utxos := u.FindUtxoSet()
 	err := u.Store.DeleteAllUTXOs()
 	if err != nil {
 		return err
@@ -143,4 +143,36 @@ func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, []
 		return nil
 	})
 	return currSum, utxos
+}
+
+func (u *UTXOset) FindUtxoSet() UTXOs {
+	UTXO := make(UTXOs)
+	spentTXOS := make(map[OutPoint]struct{})
+
+	for block := range u.Blockchain.Iterate() {
+		// For each transaction in a block
+		for _, tx := range block.Transactions {
+			// INPUTS - add outputs that have already been spent to the STXO set
+			// Ignore coinbases
+			if !tx.IsCoinbase() {
+				// For each transaction input
+				for _, in := range tx.Inputs {
+					// Add the outpoint to the set of spent outputs
+					outPoint := NewOutPoint(in.TxID, in.OutID)
+					spentTXOS[outPoint] = struct{}{}
+				}
+			}
+			// OUTPUTS - collect all outputs of the transaction
+			// For each output in this transaction
+			for outID, txOut := range tx.Outputs {
+				outPoint := NewOutPoint(tx.ID, int64(outID))
+				// Check if it is spent
+				if _, spent := spentTXOS[outPoint]; !spent {
+					// If not spent, add to the UTXO set
+					UTXO[outPoint] = txOut
+				}
+			}
+		}
+	}
+	return UTXO
 }

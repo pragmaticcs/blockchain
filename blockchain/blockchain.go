@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"github.com/pragmaticcs/blockchain/crypto"
-	"github.com/pragmaticcs/blockchain/types"
 )
 
 type GenesisConfig struct {
@@ -30,32 +29,19 @@ func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*B
 	}, nil
 }
 
-// Implements the types.iterator interface
-type BlockchainIterator struct {
-	CurrHash BlockHash
-	Store    Store
-}
-
-func (b *BlockchainIterator) Next() (*Block, bool) {
-	if b.CurrHash == nil {
-		return nil, false
-	}
-	currBlock, err := b.Store.GetBlock(b.CurrHash)
-	if err != nil {
-		return nil, false
-	}
-	b.CurrHash = currBlock.PrevHash
-	return currBlock, true
-}
-
-func (b *BlockchainIterator) Close() {
-	// Currently doesn't do anything
-}
-
-func (b *Blockchain) ToIterator() types.Iterator[*Block] {
-	return &BlockchainIterator{
-		CurrHash: b.Head,
-		Store:    b.Store,
+func (b *Blockchain) Iterate() func(func(*Block) bool) {
+	return func(yield func(*Block) bool) {
+		currHash := b.Head
+		for currHash != nil {
+			currBlock, err := b.Store.GetBlock(currHash)
+			if err != nil {
+				return
+			}
+			if !yield(currBlock) {
+				return
+			}
+			currHash = currBlock.PrevHash
+		}
 	}
 }
 
