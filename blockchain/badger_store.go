@@ -1,8 +1,6 @@
 package blockchain
 
 import (
-	"fmt"
-
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -19,7 +17,7 @@ func (b BadgerPrefix) ConstructKey(key []byte) []byte {
 }
 
 func (b BadgerPrefix) DeconstructKey(key []byte) []byte {
-	return key[(b.Len() - 1):]
+	return key[b.Len():]
 }
 
 var (
@@ -115,7 +113,6 @@ func (b *BadgerStore) ForEachUTXO(fn func(outPoint OutPoint, out TxOutput) error
 			outPointData := utxoPrefix.DeconstructKey(key)
 
 			outPoint, err := DecodeOutpoint(outPointData)
-			fmt.Println(outPoint.TxID)
 			if err != nil {
 				return err
 			}

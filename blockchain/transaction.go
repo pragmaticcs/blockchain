@@ -218,7 +218,8 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 }
 
 func (b *Blockchain) FindUtxoSet() UTXOs {
-	UTXO := make(map[OutPoint]TxOutput)
+	UTXO := make(UTXOs)
+	spentTXOS := make(map[OutPoint]struct{})
 
 	iterator := b.ToIterator()
 	defer iterator.Close()
@@ -234,17 +235,20 @@ func (b *Blockchain) FindUtxoSet() UTXOs {
 			if !tx.IsCoinbase() {
 				// For each transaction input
 				for _, in := range tx.Inputs {
-					// delete this output from UTXO set
+					// Add the outpoint to the set of spent outputs
 					outPoint := NewOutPoint(in.TxID, in.OutID)
-					delete(UTXO, outPoint)
+					spentTXOS[outPoint] = struct{}{}
 				}
 			}
 			// OUTPUTS - collect all outputs of the transaction
 			// For each output in this transaction
 			for outID, txOut := range tx.Outputs {
-				// Add it to the UTXO set
 				outPoint := NewOutPoint(tx.ID, int64(outID))
-				UTXO[outPoint] = txOut
+				// Check if it is spent
+				if _, spent := spentTXOS[outPoint]; !spent {
+					// If not spent, add to the UTXO set
+					UTXO[outPoint] = txOut
+				}
 			}
 		}
 	}

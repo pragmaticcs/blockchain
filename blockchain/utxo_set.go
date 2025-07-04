@@ -95,7 +95,7 @@ func (u *UTXOset) Update(block *Block) error {
 			continue
 		}
 		for _, in := range tx.Inputs {
-			outPoint := NewOutPoint(tx.ID, in.OutID)
+			outPoint := NewOutPoint(in.TxID, in.OutID)
 			spentOutputs = append(spentOutputs, outPoint)
 		}
 	}

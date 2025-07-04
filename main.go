@@ -31,7 +31,7 @@ func main() {
 	handle(err)
 	defer store.Close()
 
-	difficulty := 10
+	difficulty := 21
 	bch, err := blockchain.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 	stateManager := blockchain.NewStateManager(bch, wallets)
@@ -55,4 +55,14 @@ func main() {
 	handle(err)
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 
+	err = stateManager.Send(alice, bob, 5)
+	handle(err)
+
+	bobBalance, err = stateManager.GetBalance(bob)
+	handle(err)
+	fmt.Printf("Bob's balance = %d\n", bobBalance)
+
+	aliceBalance, err = stateManager.GetBalance(alice)
+	handle(err)
+	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 }

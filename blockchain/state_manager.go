@@ -110,13 +110,6 @@ func (s *StateManager) Send(from, to wallet.Address, amount int) error {
 	if err != nil {
 		return err
 	}
-	ok, err := s.Blockchain.VerifyTransaction(tx)
-	if err != nil {
-		return err
-	}
-	if ok {
-		fmt.Println("Verified transaction")
-	}
 	fmt.Println("Mining new block with transaction")
 	block, err := s.Blockchain.AddBlock([]*Transaction{tx})
 	if err != nil {
