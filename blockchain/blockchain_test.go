@@ -44,7 +44,7 @@ func TestBlockChain(t *testing.T) {
 	handle(err)
 	t.Logf("Alice's balance = %d\n", aliceBalance)
 
-	firstTx, err := bch.NewTransaction(bob, alice, 10, wallets)
+	firstTx, err := stateManager.NewTransaction(bob, alice, 10)
 
 	handle(err)
 	bch.AddBlock([]*Transaction{firstTx})

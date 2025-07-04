@@ -6,6 +6,6 @@ type BlockEncoder interface {
 }
 
 type UtxoEncoder interface {
-	Encode(*TxOutputs) ([]byte, error)
-	Decode([]byte) (*TxOutputs, error)
+	Encode(*TxOutput) ([]byte, error)
+	Decode([]byte) (*TxOutput, error)
 }

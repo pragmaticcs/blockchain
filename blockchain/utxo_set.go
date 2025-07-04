@@ -1,31 +1,60 @@
 package blockchain
 
 import (
+	"bytes"
+	"encoding/binary"
 	"sync"
 )
 
 type OutPoint struct {
 	TxID  TransactionID
-	OutID int
+	OutID int64
 }
 
-type TxOutputs struct {
-	Outputs []TxOutput
-}
-
-func NewTxOutputs(outs []TxOutput) TxOutputs {
-	return TxOutputs{
-		Outputs: outs,
+func NewOutPoint(txID TransactionID, outID int64) OutPoint {
+	return OutPoint{
+		TxID:  txID,
+		OutID: outID,
 	}
 }
 
-type UTXOs map[TransactionID]TxOutputs
+func EncodeOutpoint(o *OutPoint) ([]byte, error) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	err := binary.Write(buf, binary.LittleEndian, o.OutID)
+	if err != nil {
+		return nil, err
+	}
+	return append(o.TxID[:], buf.Bytes()...), nil
+}
+
+func DecodeOutpoint(data []byte) (*OutPoint, error) {
+	txID := TransactionID(data[:32])
+	var outID int64
+	buf := bytes.NewBuffer(data[32:])
+	err := binary.Read(buf, binary.LittleEndian, &outID)
+	if err != nil {
+		return nil, err
+	}
+	outpoint := NewOutPoint(txID, outID)
+	return &outpoint, nil
+}
+
+type UTXOs map[OutPoint]TxOutput
 
 type UTXOset struct {
 	Blockchain *Blockchain
 	Store      Store
 
 	lock sync.RWMutex
+}
+
+func NewUTXOset(b *Blockchain, s Store) *UTXOset {
+	return &UTXOset{
+		Blockchain: b,
+		Store:      s,
+		lock:       sync.RWMutex{},
+	}
 }
 
 func (u *UTXOset) Lock() {
@@ -37,46 +66,81 @@ func (u *UTXOset) Unlock() {
 }
 
 func (u *UTXOset) Reindex() error {
-	u.Lock()
-	defer u.Unlock()
 	utxos := u.Blockchain.FindUtxoSet()
-	u.Store.DeleteAllUTXOs()
-	u.Store.PutUTXOs(utxos)
+	err := u.Store.DeleteAllUTXOs()
+	if err != nil {
+		return err
+	}
+	err = u.Store.PutUTXOs(utxos)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (u *UTXOset) Update(block *Block) error {
-	u.Lock()
-	defer u.Unlock()
+	newOutputs := make(UTXOs)
+	var spentOutputs []OutPoint
 
-	stagedOutputs := make(UTXOs)
 	// Iterate over each new transaction
 	for _, tx := range block.Transactions {
 		// Process Ouputs
-		stagedOutputs[tx.ID] = NewTxOutputs(tx.Outputs)
-
+		for outID, out := range tx.Outputs {
+			outPoint := NewOutPoint(tx.ID, int64(outID))
+			newOutputs[outPoint] = out
+		}
 		// Process inputs
-
 		// Skip if coinbase
 		if tx.IsCoinbase() {
 			continue
 		}
 		for _, in := range tx.Inputs {
-			currOutputs, ok := stagedOutputs[in.TxID]
-			if !ok {
-				fetchedOutputs, err := u.Store.GetUTXO(in.TxID)
-				if err != nil {
-					return err
-				}
-				currOutputs = *fetchedOutputs
-			}
-
-			for outID, out := range currOutputs.Outputs {
-				if outID != in.OutID {
-					currOutputs.Outputs = append(currOutputs.Outputs, out)
-				}
-			}
+			outPoint := NewOutPoint(tx.ID, in.OutID)
+			spentOutputs = append(spentOutputs, outPoint)
 		}
 	}
-	return u.Store.PutUTXOs(stagedOutputs)
+	err := u.Store.DeleteUTXOs(spentOutputs)
+	if err != nil {
+		return err
+	}
+	return u.Store.PutUTXOs(newOutputs)
+}
+
+func (u *UTXOset) FindUtxos(pubKeyHash []byte) []TxOutput {
+	// Returns all the unspent outputs of an account with pubKeyHash
+	var utxos []TxOutput
+	_ = u.Store.ForEachUTXO(func(outPoint OutPoint, out TxOutput) error {
+		if out.IsLockedWithKey(pubKeyHash) {
+			utxos = append(utxos, out)
+		}
+		return nil
+	})
+	return utxos
+}
+
+func (u *UTXOset) FindSpendableAmount(pubKeyHash []byte) (int, error) {
+	// Returns the balance of an account with pubKeyHash
+	utxos := u.FindUtxos(pubKeyHash)
+	var balance int64 = 0
+	for _, utxo := range utxos {
+		balance += utxo.Value
+	}
+	return int(balance), nil
+}
+
+func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, []OutPoint) {
+	// Returns the spendable outputs of an account with pubKeyHash
+	var utxos []OutPoint
+	var currSum int64 = 0
+	_ = u.Store.ForEachUTXO(func(outPoint OutPoint, out TxOutput) error {
+		if out.IsLockedWithKey(pubKeyHash) && currSum < int64(amount) {
+			currSum += out.Value
+			utxos = append(utxos, outPoint)
+			if currSum >= int64(amount) {
+				return nil
+			}
+		}
+		return nil
+	})
+	return currSum, utxos
 }

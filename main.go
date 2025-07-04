@@ -22,8 +22,6 @@ func main() {
 	handle(err)
 	alice, err := wallets.AddWallet()
 	handle(err)
-	// err = wallets.SaveToFile()
-	// handle(err)
 
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
@@ -33,7 +31,7 @@ func main() {
 	handle(err)
 	defer store.Close()
 
-	difficulty := 20
+	difficulty := 10
 	bch, err := blockchain.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 	stateManager := blockchain.NewStateManager(bch, wallets)
@@ -46,17 +44,8 @@ func main() {
 	handle(err)
 	fmt.Printf("Alice's balance = %d\n", aliceBalance)
 
-	firstTx, err := bch.NewTransaction(bob, alice, 10, wallets)
+	err = stateManager.Send(bob, alice, 10)
 	handle(err)
-	verified, err := bch.VerifyTransaction(firstTx)
-	handle(err)
-	if verified {
-		fmt.Println("Verified transaction")
-	}
-
-	handle(err)
-	bch.AddBlock([]*blockchain.Transaction{firstTx})
-	fmt.Println("Mining new block with transaction")
 
 	bobBalance, err = stateManager.GetBalance(bob)
 	handle(err)

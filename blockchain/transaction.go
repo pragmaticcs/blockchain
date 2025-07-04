@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/pragmaticcs/blockchain/crypto"
-	"github.com/pragmaticcs/blockchain/wallet"
 )
 
 type TransactionID = [32]byte
@@ -20,55 +19,6 @@ type Transaction struct {
 	ID      TransactionID
 	Inputs  []TxInput
 	Outputs []TxOutput
-}
-
-func (b *Blockchain) NewTransaction(from, to wallet.Address, amount int, wallets *wallet.Wallets) (*Transaction, error) {
-	var inputs []TxInput
-	var outputs []TxOutput
-
-	sender, err := wallets.GetWallet(from)
-	if err != nil {
-		return nil, err
-	}
-	pubKeyHash, err := crypto.HashPublicKey(sender.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-	sum, outs, err := b.FindSpendableOutputs(pubKeyHash, amount)
-	if err != nil {
-		return nil, err
-	}
-	if sum < int64(amount) {
-		return nil, wallet.ErrorInsufficientBalance
-	}
-	for txID, outIDarray := range outs {
-		for _, outID := range outIDarray {
-			in := TxInput{
-				TxID:   txID,
-				OutID:  outID,
-				Sig:    nil,
-				PubKey: sender.PublicKey,
-			}
-			inputs = append(inputs, in)
-		}
-	}
-	outputs = append(outputs, *NewTxOutput(amount, []byte(to))) // Transfer to reciever
-	if sum > int64(amount) {
-		outputs = append(outputs, *NewTxOutput(int(sum)-amount, []byte(from))) // Transfer change back
-	}
-
-	tx := &Transaction{
-		ID:      TransactionZeroID,
-		Outputs: outputs,
-		Inputs:  inputs,
-	}
-	txID := tx.GetHash()
-	tx.ID = txID
-	err = b.SignTransaction(tx, sender.PrivateKey)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
 }
 
 func (t *Transaction) GetHash() [32]byte {
@@ -118,7 +68,7 @@ func NewTxOutput(value int, address []byte) *TxOutput {
 
 type TxInput struct {
 	TxID   TransactionID // Points to the ID of the Transaction
-	OutID  int           // Points to the index of Tx in the list of Tx's inside the Transaction [ID]
+	OutID  int64         // Points to the index of Tx in the list of Tx's inside the Transaction [ID]
 	Sig    crypto.Signature
 	PubKey crypto.PubKey
 }
@@ -126,7 +76,7 @@ type TxInput struct {
 func (in *TxInput) GetData() []byte {
 	return bytes.Join([][]byte{
 		in.TxID[:],
-		GetHexValue(int64(in.OutID)),
+		GetHexValue(in.OutID),
 		in.Sig,
 		in.PubKey,
 	}, []byte{})
@@ -268,8 +218,7 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 }
 
 func (b *Blockchain) FindUtxoSet() UTXOs {
-	UTXO := make(map[TransactionID]TxOutputs)
-	spentTXOs := make(map[TransactionID][]int)
+	UTXO := make(map[OutPoint]TxOutput)
 
 	iterator := b.ToIterator()
 	defer iterator.Close()
@@ -280,37 +229,22 @@ func (b *Blockchain) FindUtxoSet() UTXOs {
 		}
 		// For each transaction in a block
 		for _, tx := range block.Transactions {
+			// INPUTS - add outputs that have already been spent to the STXO set
+			// Ignore coinbases
+			if !tx.IsCoinbase() {
+				// For each transaction input
+				for _, in := range tx.Inputs {
+					// delete this output from UTXO set
+					outPoint := NewOutPoint(in.TxID, in.OutID)
+					delete(UTXO, outPoint)
+				}
+			}
 			// OUTPUTS - collect all outputs of the transaction
 			// For each output in this transaction
-		Outputs:
-			for i, txOut := range tx.Outputs {
-				// Check if transaction is in utxo set
-				spentOutsIDs, ok := spentTXOs[tx.ID]
-				if ok {
-					// If transaction is in the set
-					// for each unspent transaction
-					for _, spentOutID := range spentOutsIDs {
-						// Check if current txOut is already spent
-						if spentOutID == i {
-							// If it is spent -> continue with the next output
-							continue Outputs
-						}
-					}
-				}
-				// Check if the output is owned by the owner of pubkey
-				outs := UTXO[tx.ID]
-				outs.Outputs = append(UTXO[tx.ID].Outputs, txOut)
-				UTXO[tx.ID] = outs
-			}
-			// INPUTS - remove outputs that have already been spent
-			// Ignore coinbases
-			if tx.IsCoinbase() {
-				continue
-			}
-			for _, in := range tx.Inputs {
-				// For each input in the transaction's list of inputs
-				// Add the output the input uses to the set of spent outputs
-				spentTXOs[in.TxID] = append(spentTXOs[in.TxID], in.OutID)
+			for outID, txOut := range tx.Outputs {
+				// Add it to the UTXO set
+				outPoint := NewOutPoint(tx.ID, int64(outID))
+				UTXO[outPoint] = txOut
 			}
 		}
 	}
@@ -319,9 +253,12 @@ func (b *Blockchain) FindUtxoSet() UTXOs {
 
 func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
 	iter := b.ToIterator()
-
-	for currBlock, ok := iter.Next(); ok; {
-		for _, tx := range currBlock.Transactions {
+	for {
+		block, ok := iter.Next()
+		if !ok {
+			break
+		}
+		for _, tx := range block.Transactions {
 			if tx.ID == id {
 				return tx, nil
 			}
@@ -332,7 +269,6 @@ func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
 
 func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) error {
 	prevTxs := make(map[TransactionID]Transaction)
-
 	for _, in := range tx.Inputs {
 		prevTx, err := b.FindTransaction(in.TxID)
 		if err != nil {
@@ -354,52 +290,6 @@ func (b *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
 		prevTxs[prevTx.ID] = *prevTx
 	}
 	return tx.Verify(prevTxs)
-}
-
-func (b *Blockchain) FindUtxos(pubKeyHash []byte) ([]TxOutput, error) {
-	var utxos []TxOutput
-	utxoSet := b.FindUtxoSet()
-	for _, outs := range utxoSet {
-		for _, out := range outs.Outputs {
-			if out.IsLockedWithKey(pubKeyHash) {
-				utxos = append(utxos, out)
-			}
-		}
-	}
-	return utxos, nil
-}
-
-func (b *Blockchain) FindSpendableAmount(pubKeyHash []byte) (int, error) {
-	// Returns the balance of an account with pubKeyHash
-	utxos, err := b.FindUtxos(pubKeyHash)
-	if err != nil {
-		return -1, err
-	}
-	var balance int64 = 0
-	for _, utxo := range utxos {
-		balance += utxo.Value
-	}
-	return int(balance), nil
-}
-
-func (b *Blockchain) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, map[TransactionID][]int, error) {
-	// Returns a hash map of transaction id / array of indexes of outputs
-	utxoSet := b.FindUtxoSet()
-	spendableOuts := make(map[TransactionID][]int)
-	var currSum int64 = 0
-Outer:
-	for txID, utxos := range utxoSet {
-		for id, out := range utxos.Outputs {
-			if out.IsLockedWithKey(pubKeyHash) && currSum < int64(amount) {
-				currSum += out.Value
-				spendableOuts[txID] = append(spendableOuts[txID], id)
-				if currSum >= int64(amount) {
-					break Outer
-				}
-			}
-		}
-	}
-	return currSum, spendableOuts, nil
 }
 
 type TransactionError struct {

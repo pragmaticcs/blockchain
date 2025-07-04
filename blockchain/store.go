@@ -8,18 +8,11 @@ type Store interface {
 	GetBlock(hash BlockHash) (*Block, error)
 
 	// UTXO operations
-	// Create/Update
-	// PutUTXO(txID TransactionID, utxo *TxOutputs) error
-	// Read
-	GetUTXO(txID TransactionID) (*TxOutputs, error)
-	// GetAllUTXOs() (UTXOs, error)
-	// Delete
-	DeleteUTXO(txID TransactionID) error
+	ForEachUTXO(fn func(outPoint OutPoint, out TxOutput) error) error
 	DeleteAllUTXOs() error
 
-	// Batch UTXO operations
 	PutUTXOs(UTXOs) error
-	// DeleteUTXOs() error
+	DeleteUTXOs([]OutPoint) error
 
 	Close() error
 }
