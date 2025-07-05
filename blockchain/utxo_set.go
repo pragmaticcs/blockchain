@@ -152,25 +152,25 @@ func (u *UTXOset) FindUtxoSet() UTXOs {
 	for block := range u.Blockchain.Iterate() {
 		// For each transaction in a block
 		for _, tx := range block.Transactions {
-			// INPUTS - add outputs that have already been spent to the STXO set
-			// Ignore coinbases
-			if !tx.IsCoinbase() {
-				// For each transaction input
-				for _, in := range tx.Inputs {
-					// Add the outpoint to the set of spent outputs
-					outPoint := NewOutPoint(in.TxID, in.OutID)
-					spentTXOS[outPoint] = struct{}{}
-				}
-			}
-			// OUTPUTS - collect all outputs of the transaction
+			// Handle OUTPUTS
 			// For each output in this transaction
 			for outID, txOut := range tx.Outputs {
 				outPoint := NewOutPoint(tx.ID, int64(outID))
-				// Check if it is spent
+				// Check if it was used in a future transaction
 				if _, spent := spentTXOS[outPoint]; !spent {
 					// If not spent, add to the UTXO set
 					UTXO[outPoint] = txOut
 				}
+			}
+			// Handle INPUTS
+			// Skip this step for coinbases
+			if tx.IsCoinbase() {
+				continue
+			}
+			for _, in := range tx.Inputs {
+				// Add the outpoint to the set of spent outputs
+				outPoint := NewOutPoint(in.TxID, in.OutID)
+				spentTXOS[outPoint] = struct{}{}
 			}
 		}
 	}

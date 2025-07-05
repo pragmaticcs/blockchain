@@ -24,17 +24,20 @@ func TestBadgerStore(t *testing.T) {
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
 	difficulty := 16
-	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
+	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
 
 	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir))
+
 	handle(err)
 	defer store.Close()
+
 	bch, err := NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
+	block := bch.NewBlock([]*Transaction{coinbase})
 	handle(err)
-	block, err := bch.AddBlock([]*Transaction{coinbase})
+	err = bch.AddBlock(block)
 	handle(err)
 
 	blockFromDB, err := store.GetBlock(block.Hash)

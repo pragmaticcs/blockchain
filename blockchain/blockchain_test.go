@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/pragmaticcs/blockchain/wallet"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBlockChain(t *testing.T) {
@@ -25,9 +26,9 @@ func TestBlockChain(t *testing.T) {
 
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
-	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
+	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
 
-	difficulty := 20
+	difficulty := 10
 	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir))
 	handle(err)
 
@@ -39,22 +40,22 @@ func TestBlockChain(t *testing.T) {
 	bobBalance, err := stateManager.GetBalance(bob)
 	handle(err)
 	t.Logf("Bob's balance = %d\n", bobBalance)
+	assert.EqualValues(t, bobBalance, 50)
 
 	aliceBalance, err := stateManager.GetBalance(alice)
 	handle(err)
 	t.Logf("Alice's balance = %d\n", aliceBalance)
+	assert.EqualValues(t, aliceBalance, 0)
 
-	firstTx, err := stateManager.NewTransaction(bob, alice, 10)
-
-	handle(err)
-	bch.AddBlock([]*Transaction{firstTx})
-	t.Log("Mining new block with transaction\n")
+	stateManager.Send(bob, alice, 10)
 
 	bobBalance, err = stateManager.GetBalance(bob)
 	handle(err)
 	t.Logf("Bob's balance = %d\n", bobBalance)
+	assert.EqualValues(t, bobBalance, 40)
 
 	aliceBalance, err = stateManager.GetBalance(alice)
 	handle(err)
 	t.Logf("Alice's balance = %d\n", aliceBalance)
+	assert.EqualValues(t, aliceBalance, 10)
 }

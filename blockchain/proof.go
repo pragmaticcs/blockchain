@@ -44,7 +44,6 @@ func (p *POW) Run() (int32, []byte) {
 		hash = sha256.Sum256(data)
 		intHash.SetBytes(hash[:])
 
-		// log.Println("Nonce  = ", nonce)
 		if intHash.Cmp(p.Target) == -1 { // Check if we found a value that is smaller than target
 			break
 		}

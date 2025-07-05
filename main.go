@@ -25,13 +25,13 @@ func main() {
 
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
-	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey, Sig: nil}
+	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
 
 	store, err := blockchain.NewBadgerStore("badger")
 	handle(err)
 	defer store.Close()
 
-	difficulty := 21
+	difficulty := 10
 	bch, err := blockchain.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 	stateManager := blockchain.NewStateManager(bch, wallets)

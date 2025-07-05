@@ -7,7 +7,6 @@ import (
 type GenesisConfig struct {
 	Amount int
 	To     crypto.PubKey
-	Sig    crypto.Signature
 }
 
 type Blockchain struct {
@@ -45,19 +44,15 @@ func (b *Blockchain) Iterate() func(func(*Block) bool) {
 	}
 }
 
-func (b *Blockchain) AddBlock(transactions []*Transaction) (*Block, error) {
-	block := NewBlock(b.Head, transactions)
-	// Run the proof of work
-	pow := NewPOW(block, b.CurrDifficulty)
+func (b *Blockchain) NewBlock(transactions []*Transaction) *Block {
+	return NewBlock(b.Head, transactions)
+}
 
-	block.Nonce, block.Hash = pow.Run()
+func (b *Blockchain) NewPOW(block *Block) *POW {
+	return NewPOW(block, b.CurrDifficulty)
+}
 
+func (b *Blockchain) AddBlock(block *Block) error {
 	b.Head = block.Hash
-
-	// Add the mined block to the store
-	err := b.Store.PutBlock(block)
-	if err != nil {
-		return nil, err
-	}
-	return block, nil
+	return b.Store.PutBlock(block)
 }
