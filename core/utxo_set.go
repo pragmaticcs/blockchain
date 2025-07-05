@@ -1,4 +1,4 @@
-package blockchain
+package core
 
 import (
 	"bytes"
@@ -99,11 +99,7 @@ func (u *UTXOset) Update(block *Block) error {
 			spentOutputs = append(spentOutputs, outPoint)
 		}
 	}
-	err := u.Store.DeleteUTXOs(spentOutputs)
-	if err != nil {
-		return err
-	}
-	return u.Store.PutUTXOs(newOutputs)
+	return u.Store.PutDeleteUTXOs(newOutputs, spentOutputs)
 }
 
 func (u *UTXOset) FindUtxos(pubKeyHash []byte) []TxOutput {
@@ -152,6 +148,15 @@ func (u *UTXOset) FindUtxoSet() UTXOs {
 	for block := range u.Blockchain.Iterate() {
 		// For each transaction in a block
 		for _, tx := range block.Transactions {
+			// Handle INPUTS
+			// Skip this step for coinbases
+			if !tx.IsCoinbase() {
+				for _, in := range tx.Inputs {
+					// Add the outpoint to the set of spent outputs
+					outPoint := NewOutPoint(in.TxID, in.OutID)
+					spentTXOS[outPoint] = struct{}{}
+				}
+			}
 			// Handle OUTPUTS
 			// For each output in this transaction
 			for outID, txOut := range tx.Outputs {
@@ -161,16 +166,6 @@ func (u *UTXOset) FindUtxoSet() UTXOs {
 					// If not spent, add to the UTXO set
 					UTXO[outPoint] = txOut
 				}
-			}
-			// Handle INPUTS
-			// Skip this step for coinbases
-			if tx.IsCoinbase() {
-				continue
-			}
-			for _, in := range tx.Inputs {
-				// Add the outpoint to the set of spent outputs
-				outPoint := NewOutPoint(in.TxID, in.OutID)
-				spentTXOS[outPoint] = struct{}{}
 			}
 		}
 	}

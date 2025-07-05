@@ -1,4 +1,4 @@
-package blockchain
+package core
 
 type Store interface {
 	// Block operations
@@ -13,6 +13,8 @@ type Store interface {
 
 	PutUTXOs(UTXOs) error
 	DeleteUTXOs([]OutPoint) error
+	// Combined operation for atomicity
+	PutDeleteUTXOs(put UTXOs, delete []OutPoint) error
 
 	Close() error
 }

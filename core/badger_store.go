@@ -1,4 +1,4 @@
-package blockchain
+package core
 
 import (
 	"github.com/dgraph-io/badger/v4"
@@ -6,6 +6,10 @@ import (
 
 type BadgerPrefix struct {
 	Prefix []byte
+}
+
+func NewBadgerPrefix(prefix []byte) BadgerPrefix {
+	return BadgerPrefix{Prefix: prefix}
 }
 
 func (b BadgerPrefix) Len() int {
@@ -21,8 +25,8 @@ func (b BadgerPrefix) DeconstructKey(key []byte) []byte {
 }
 
 var (
-	blockPrefix = BadgerPrefix{Prefix: []byte("block-")}
-	utxoPrefix  = BadgerPrefix{Prefix: []byte("utxo-")}
+	blockPrefix = NewBadgerPrefix([]byte("block-"))
+	utxoPrefix  = NewBadgerPrefix([]byte("utxo-"))
 )
 
 type BadgerStore struct {
@@ -81,9 +85,64 @@ func (b *BadgerStore) DeletePrefix(Prefix BadgerPrefix) error {
 	return b.DB.DropPrefix([]byte(Prefix.Prefix))
 }
 
+func (b *BadgerStore) PutUTXOs(utxos UTXOs) error {
+	return b.DB.Update(func(txn *badger.Txn) error {
+		for outPoint, utxo := range utxos {
+			key, err := EncodeOutpoint(&outPoint)
+			if err != nil {
+				return err
+			}
+			key = utxoPrefix.ConstructKey(key)
+			value, err := b.UtxoEncoder.Encode(&utxo)
+			if err != nil {
+				return err
+			}
+			err = txn.Set(key, value)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (b *BadgerStore) DeleteUTXOs(outPoints []OutPoint) error {
 	return b.DB.Update(func(txn *badger.Txn) error {
 		for _, outPoint := range outPoints {
+			outPointData, err := EncodeOutpoint(&outPoint)
+			if err != nil {
+				return err
+			}
+			key := utxoPrefix.ConstructKey(outPointData)
+			err = txn.Delete(key)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (b *BadgerStore) PutDeleteUTXOs(put UTXOs, delete []OutPoint) error {
+	// This method combines adding and deleting values
+	// in one atomic transaction
+	return b.DB.Update(func(txn *badger.Txn) error {
+		for outPoint, utxo := range put {
+			key, err := EncodeOutpoint(&outPoint)
+			if err != nil {
+				return err
+			}
+			key = utxoPrefix.ConstructKey(key)
+			value, err := b.UtxoEncoder.Encode(&utxo)
+			if err != nil {
+				return err
+			}
+			err = txn.Set(key, value)
+			if err != nil {
+				return err
+			}
+		}
+		for _, outPoint := range delete {
 			outPointData, err := EncodeOutpoint(&outPoint)
 			if err != nil {
 				return err
@@ -133,24 +192,6 @@ func (b *BadgerStore) ForEachUTXO(fn func(outPoint OutPoint, out TxOutput) error
 			if err := fn(*outPoint, *utxo); err != nil {
 				return err
 			}
-		}
-		return nil
-	})
-}
-
-func (b *BadgerStore) PutUTXOs(utxos UTXOs) error {
-	return b.DB.Update(func(txn *badger.Txn) error {
-		for outPoint, utxo := range utxos {
-			key, err := EncodeOutpoint(&outPoint)
-			if err != nil {
-				return err
-			}
-			key = utxoPrefix.ConstructKey(key)
-			value, err := b.UtxoEncoder.Encode(&utxo)
-			if err != nil {
-				return err
-			}
-			txn.Set(key, value)
 		}
 		return nil
 	})

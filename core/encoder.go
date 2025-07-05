@@ -1,4 +1,4 @@
-package blockchain
+package core
 
 type BlockEncoder interface {
 	Encode(*Block) ([]byte, error)

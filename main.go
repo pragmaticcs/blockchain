@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/pragmaticcs/blockchain/blockchain"
+	"github.com/pragmaticcs/blockchain/core"
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
@@ -15,6 +15,7 @@ func handle(err error) {
 }
 
 func main() {
+
 	wallets, err := wallet.InitWallets("wallets.json")
 	handle(err)
 
@@ -25,16 +26,17 @@ func main() {
 
 	bobsWallet, err := wallets.GetWallet(bob)
 	handle(err)
-	genesisConf := blockchain.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
 
-	store, err := blockchain.NewBadgerStore("badger")
+	genesisConf := core.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
+
+	store, err := core.NewBadgerStore("badger")
 	handle(err)
 	defer store.Close()
 
 	difficulty := 10
-	bch, err := blockchain.NewBlockchain(difficulty, genesisConf, store)
+	bch, err := core.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
-	stateManager := blockchain.NewStateManager(bch, wallets)
+	stateManager := core.NewStateManager(bch, wallets)
 
 	bobBalance, err := stateManager.GetBalance(bob)
 	handle(err)
