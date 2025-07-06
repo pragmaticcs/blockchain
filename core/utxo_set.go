@@ -142,6 +142,9 @@ func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, []
 }
 
 func (u *UTXOset) FindUtxoSet() UTXOs {
+	// TODO: Maybe use forward pass instead of backward
+	// using the badger iterator to process the blockchain
+	// more efficiently in one transaction
 	UTXO := make(UTXOs)
 	spentTXOS := make(map[OutPoint]struct{})
 
