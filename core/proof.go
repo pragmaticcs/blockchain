@@ -1,8 +1,6 @@
 package core
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"math"
 	"math/big"
 )
@@ -24,37 +22,26 @@ func NewPOW(b *Block, difficulty uint) *POW {
 	}
 }
 
-func (p *POW) GetData(nonce int32) []byte {
-	// Converts POW to bytes
-	return bytes.Join([][]byte{
-		p.Block.GetData(),
-		GetHexValue(int64(nonce)),
-		GetHexValue(int64(p.Difficulty)),
-	}, []byte{})
-}
-
-func (p *POW) Run() (int32, []byte) {
-	// Return the nonce and hash
+func (p *POW) Run() bool {
+	// Return the hash of the block
 	var intHash big.Int
-	var hash [32]byte
 
-	nonce := 0
-	for ; nonce < math.MaxInt64; nonce++ {
-		data := p.GetData(int32(nonce))
-		hash = sha256.Sum256(data)
+	mined := false
+	for p.Block.Nonce = 0; p.Block.Nonce < math.MaxInt32; p.Block.Nonce++ {
+		hash := p.Block.GetHash()
 		intHash.SetBytes(hash[:])
 
 		if intHash.Cmp(p.Target) == -1 { // Check if we found a value that is smaller than target
+			mined = true
 			break
 		}
 	}
-	return int32(nonce), hash[:]
+	return mined
 }
 
 func (p *POW) Validate() bool {
 	//  Simply reversing the POW.Run() function
-	data := p.GetData(p.Block.Nonce)
-	hash := sha256.Sum256(data)
+	hash := p.Block.GetHash()
 	var intHash big.Int
 	intHash.SetBytes(hash[:])
 	return intHash.Cmp(p.Target) == -1

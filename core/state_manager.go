@@ -110,7 +110,8 @@ func (s *StateManager) Mine(transactions []*Transaction) *Block {
 	// Run the proof of work
 	pow := s.Blockchain.NewPOW(block)
 
-	block.Nonce, block.Hash = pow.Run()
+	// TODO: handle if couldn't mine the block
+	_ = pow.Run()
 
 	return block
 }

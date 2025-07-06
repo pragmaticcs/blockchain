@@ -32,7 +32,7 @@ func main() {
 	handle(err)
 	defer store.Close()
 
-	difficulty := 10
+	difficulty := 24
 	bch, err := core.NewBlockchain(difficulty, genesisConf, store)
 	handle(err)
 	stateManager := core.NewStateManager(bch, wallets)

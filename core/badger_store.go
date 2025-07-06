@@ -71,7 +71,7 @@ func (b *BadgerStore) PutBlock(block *Block) error {
 	if err != nil {
 		return err
 	}
-	key := blockPrefix.ConstructKey(block.Hash)
+	key := blockPrefix.ConstructKey(block.GetHash())
 	return b.DB.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, value)
 	})

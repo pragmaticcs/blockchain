@@ -12,9 +12,9 @@ import (
 type BlockHash = []byte
 
 type BlockHeader struct {
-	Hash     BlockHash // 32 bytes
-	PrevHash BlockHash // 32 bytes
-	// MerkelRoot [32]byte
+	Hash       BlockHash // 32 bytes
+	PrevHash   BlockHash // 32 bytes
+	MerkelRoot MerkleHash
 	// Time       time.Time // ???
 	Nonce int32
 }
@@ -24,48 +24,46 @@ type BlockBody struct {
 }
 
 type Block struct {
-	// BlockSize int32
 	BlockHeader
 	BlockBody
 }
 
 func NewBlock(prevHash []byte, transactions []*Transaction) *Block {
+	blockBody := BlockBody{
+		Transactions: transactions,
+	}
+	merkleTree := blockBody.GetMerkleTree()
 	block := &Block{
 		BlockHeader: BlockHeader{
-			PrevHash: prevHash,
-			Nonce:    0, // ??? Maybe should be an arg? IDK
+			PrevHash:   prevHash,
+			Nonce:      0,
+			MerkelRoot: merkleTree.Root,
 		},
-		BlockBody: BlockBody{
-			Transactions: transactions,
-		},
+		BlockBody: blockBody,
 	}
-	block.Hash = block.GetHash()
 	return block
 }
 
-func (b *Block) GetTransactionsData() []byte {
-	// Returns the hash of an array of IDs in the block
-	var ids [][]byte
-
+func (b *BlockBody) GetMerkleTree() *MerkleTree {
+	var txIDs []TransactionID
 	for _, tx := range b.Transactions {
-		ids = append(ids, tx.ID[:])
+		txIDs = append(txIDs, tx.ID)
 	}
-	flattenedIds := bytes.Join(ids, []byte{})
-	hash := sha256.Sum256(flattenedIds)
-	return hash[:]
+	merkleTree, _ := NewMerkleTree(txIDs)
+	return merkleTree
 }
 
-func (b *Block) GetData() []byte {
+func (b *BlockHeader) GetData() []byte {
 	// Converts block into bytes
 	data := bytes.Join([][]byte{
 		b.PrevHash[:],
-		b.GetTransactionsData()},
+		b.MerkelRoot,
+		GetHexValue(int64(b.Nonce))},
 		[]byte{})
 	return data
 }
 
-func (b *Block) GetHash() []byte {
-	// Returns the hash of the block
+func (b *BlockHeader) GetHash() BlockHash {
 	hash := sha256.Sum256(b.GetData())
 	return hash[:]
 }

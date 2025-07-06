@@ -53,6 +53,6 @@ func (b *Blockchain) NewPOW(block *Block) *POW {
 }
 
 func (b *Blockchain) AddBlock(block *Block) error {
-	b.Head = block.Hash
+	b.Head = block.GetHash()
 	return b.Store.PutBlock(block)
 }
