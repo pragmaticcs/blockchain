@@ -10,37 +10,32 @@ import (
 
 func TestBadgerStore(t *testing.T) {
 	tempDir := t.TempDir()
-	handle := func(err error) {
-		if err != nil {
-			t.Error(err)
-		}
-	}
 	wallets := &wallet.Wallets{
 		Wallets:      map[wallet.Address]*wallet.Wallet{},
 		SaveFilePath: "wallets.json",
 	}
 	bob, err := wallets.AddWallet()
-	handle(err)
+	assert.NoError(t, err)
 	bobsWallet, err := wallets.GetWallet(bob)
-	handle(err)
+	assert.NoError(t, err)
 	difficulty := 16
 	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
 
 	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir))
 
-	handle(err)
+	assert.NoError(t, err)
 	defer store.Close()
 
 	bch, err := NewBlockchain(difficulty, genesisConf, store)
-	handle(err)
+	assert.NoError(t, err)
 
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
 	block := bch.NewBlock([]*Transaction{coinbase})
-	handle(err)
+	assert.NoError(t, err)
 	err = bch.AddBlock(block)
-	handle(err)
+	assert.NoError(t, err)
 
 	blockFromDB, err := store.GetBlock(block.Hash)
-	handle(err)
+	assert.NoError(t, err)
 	assert.EqualValues(t, block, blockFromDB)
 }

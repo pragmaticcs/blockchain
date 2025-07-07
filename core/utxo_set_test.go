@@ -7,17 +7,12 @@ import (
 )
 
 func TestOutpointEncoding(t *testing.T) {
-	handle := func(err error) {
-		if err != nil {
-			t.Error(err)
-		}
-	}
 	txID := []byte("12345678123456781234567812345678")
 
 	outpoint := NewOutPoint(TransactionID(txID), 5)
 	enc, err := EncodeOutpoint(&outpoint)
-	handle(err)
+	assert.NoError(t, err)
 	dec, err := DecodeOutpoint(enc)
-	handle(err)
+	assert.NoError(t, err)
 	assert.EqualValues(t, outpoint, *dec)
 }
