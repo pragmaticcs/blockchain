@@ -1,10 +1,5 @@
 package p2p
 
-type RPC struct {
-	From    string
-	Payload []byte
-}
-
-// Handles the transport (TCP, UDP)
+// Handles the transport (TCP, UDP, gRPC)
 type Transport interface {
 }

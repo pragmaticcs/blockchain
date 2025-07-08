@@ -30,12 +30,13 @@ func TestBadgerStore(t *testing.T) {
 	assert.NoError(t, err)
 
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
-	block := bch.NewBlock([]*Transaction{coinbase})
+	assert.NoError(t, err)
+	block, err := bch.NewBlock([]*Transaction{coinbase})
 	assert.NoError(t, err)
 	err = bch.AddBlock(block)
 	assert.NoError(t, err)
 
-	blockFromDB, err := store.GetBlock(block.Hash)
+	blockFromDB, err := store.GetBlock(block.GetHash())
 	assert.NoError(t, err)
 	assert.EqualValues(t, block, blockFromDB)
 }

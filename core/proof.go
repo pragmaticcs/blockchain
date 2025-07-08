@@ -7,28 +7,27 @@ import (
 
 type POW struct {
 	// Proof of Work required to mine the block
-	Block      *Block
 	Target     *big.Int
-	Difficulty uint
+	Difficulty uint32
 }
 
-func NewPOW(b *Block, difficulty uint) *POW {
+func NewPOW(difficulty uint32) *POW {
 	// Creating a new Proof of Work with given block and difficulty
 	target := big.NewInt(1)
 	return &POW{
-		Block:      b,
-		Target:     target.Lsh(target, 256-difficulty),
+		Target:     target.Lsh(target, 256-uint(difficulty)),
 		Difficulty: difficulty,
 	}
 }
 
-func (p *POW) Run() bool {
+func (p *POW) Run(b *Block) bool {
 	// Return the hash of the block
 	var intHash big.Int
 
+	b.Difficulty = p.Difficulty
 	mined := false
-	for p.Block.Nonce = 0; p.Block.Nonce < math.MaxInt32; p.Block.Nonce++ {
-		hash := p.Block.GetHash()
+	for b.Nonce = 0; b.Nonce < math.MaxInt32; b.Nonce++ {
+		hash := b.GetHash()
 		intHash.SetBytes(hash[:])
 
 		if intHash.Cmp(p.Target) == -1 { // Check if we found a value that is smaller than target
@@ -39,9 +38,9 @@ func (p *POW) Run() bool {
 	return mined
 }
 
-func (p *POW) Validate() bool {
+func (p *POW) Validate(b *Block) bool {
 	//  Simply reversing the POW.Run() function
-	hash := p.Block.GetHash()
+	hash := b.GetHash()
 	var intHash big.Int
 	intHash.SetBytes(hash[:])
 	return intHash.Cmp(p.Target) == -1

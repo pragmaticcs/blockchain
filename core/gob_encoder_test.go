@@ -20,7 +20,8 @@ func TestGobEncoderDecoder(t *testing.T) {
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
 	assert.NoError(t, err)
 
-	block := NewBlock(nil, []*Transaction{coinbase})
+	block, err := NewBlock(nil, []*Transaction{coinbase})
+	assert.NoError(t, err)
 
 	gobEncoder := GobEncoder[Block]{}
 	encoding, err := gobEncoder.Encode(block)

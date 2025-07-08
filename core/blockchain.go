@@ -12,7 +12,7 @@ type GenesisConfig struct {
 type Blockchain struct {
 	Store          Store
 	Head           BlockHash
-	CurrDifficulty uint
+	CurrDifficulty uint32
 }
 
 func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
@@ -24,7 +24,7 @@ func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*B
 	return &Blockchain{
 		Store:          store,
 		Head:           genesis.GetHash(),
-		CurrDifficulty: uint(difficulty),
+		CurrDifficulty: uint32(difficulty),
 	}, nil
 }
 
@@ -44,12 +44,12 @@ func (b *Blockchain) Iterate() func(func(*Block) bool) {
 	}
 }
 
-func (b *Blockchain) NewBlock(transactions []*Transaction) *Block {
+func (b *Blockchain) NewBlock(transactions []*Transaction) (*Block, error) {
 	return NewBlock(b.Head, transactions)
 }
 
-func (b *Blockchain) NewPOW(block *Block) *POW {
-	return NewPOW(block, b.CurrDifficulty)
+func (b *Blockchain) NewPOW() *POW {
+	return NewPOW(b.CurrDifficulty)
 }
 
 func (b *Blockchain) AddBlock(block *Block) error {

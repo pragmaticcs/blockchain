@@ -105,15 +105,18 @@ func (s *StateManager) NewTransaction(from, to wallet.Address, amount int) (*Tra
 	return tx, nil
 }
 
-func (s *StateManager) Mine(transactions []*Transaction) *Block {
-	block := s.Blockchain.NewBlock(transactions)
+func (s *StateManager) Mine(transactions []*Transaction) (*Block, error) {
+	block, err := s.Blockchain.NewBlock(transactions)
+	if err != nil {
+		return nil, err
+	}
 	// Run the proof of work
-	pow := s.Blockchain.NewPOW(block)
+	pow := s.Blockchain.NewPOW()
 
 	// TODO: handle if couldn't mine the block
-	_ = pow.Run()
+	_ = pow.Run(block)
 
-	return block
+	return block, err
 }
 
 func (s *StateManager) Update(block *Block) error {
@@ -130,6 +133,9 @@ func (s *StateManager) Send(from, to wallet.Address, amount int) error {
 		return err
 	}
 	fmt.Println("Mining new block with transactions")
-	block := s.Mine([]*Transaction{tx})
+	block, err := s.Mine([]*Transaction{tx})
+	if err != nil {
+		return err
+	}
 	return s.Update(block)
 }

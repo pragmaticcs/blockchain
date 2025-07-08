@@ -5,18 +5,22 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"log"
+	"time"
 
 	"github.com/pragmaticcs/blockchain/crypto"
 )
 
+const CurrentVersion uint32 = 1
+
 type BlockHash = []byte
 
 type BlockHeader struct {
-	Hash       BlockHash // 32 bytes
-	PrevHash   BlockHash // 32 bytes
-	MerkelRoot MerkleHash
-	// Time       time.Time // ???
-	Nonce int32
+	Version    uint32
+	PrevHash   BlockHash
+	MerkleRoot MerkleHash
+	Time       int64
+	Nonce      int32
+	Difficulty uint32
 }
 
 type BlockBody struct {
@@ -28,37 +32,44 @@ type Block struct {
 	BlockBody
 }
 
-func NewBlock(prevHash []byte, transactions []*Transaction) *Block {
+func NewBlock(prevHash []byte, transactions []*Transaction) (*Block, error) {
 	blockBody := BlockBody{
 		Transactions: transactions,
 	}
-	merkleTree := blockBody.GetMerkleTree()
+	merkleTree, err := blockBody.GetMerkleTree()
+	if err != nil {
+		return nil, err
+	}
 	block := &Block{
 		BlockHeader: BlockHeader{
 			PrevHash:   prevHash,
+			MerkleRoot: merkleTree.Root,
+			Time:       time.Now().Unix(),
 			Nonce:      0,
-			MerkelRoot: merkleTree.Root,
+			Difficulty: 0,
 		},
 		BlockBody: blockBody,
 	}
-	return block
+	return block, nil
 }
 
-func (b *BlockBody) GetMerkleTree() *MerkleTree {
+func (b *BlockBody) GetMerkleTree() (*MerkleTree, error) {
 	var txIDs []TransactionID
 	for _, tx := range b.Transactions {
 		txIDs = append(txIDs, tx.ID)
 	}
-	merkleTree, _ := NewMerkleTree(txIDs)
-	return merkleTree
+	return NewMerkleTree(txIDs)
 }
 
 func (b *BlockHeader) GetData() []byte {
 	// Converts block into bytes
 	data := bytes.Join([][]byte{
+		GetHexValue(int64(b.Version)),
 		b.PrevHash[:],
-		b.MerkelRoot,
-		GetHexValue(int64(b.Nonce))},
+		b.MerkleRoot,
+		GetHexValue(b.Time),
+		GetHexValue(int64(b.Nonce)),
+		GetHexValue(int64(b.Difficulty))},
 		[]byte{})
 	return data
 }
@@ -83,5 +94,5 @@ func CreateGenesisBlock(value int, to crypto.PubKey) (*Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBlock([]byte{}, []*Transaction{coinbase}), nil
+	return NewBlock([]byte{}, []*Transaction{coinbase})
 }
