@@ -2,7 +2,7 @@ package core
 
 type Store interface {
 	// Block operations
-	// Don't need a delete/update block method cause
+	// Don't need a delete block method cause
 	// a blockchain is immutable by design
 	PutBlock(block *Block) error
 	GetBlock(hash BlockHash) (*Block, error)

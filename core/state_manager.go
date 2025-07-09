@@ -12,6 +12,8 @@ type StateManager struct {
 	Blockchain *Blockchain
 	UtxoSet    *UTXOset
 	Wallets    *wallet.Wallets
+	// Copy of pointer to store to handle closing
+	store Store
 
 	// Mutexes
 	selfLock    sync.RWMutex // Use when modifying the state of blockchain itself
@@ -25,6 +27,7 @@ func NewStateManager(b *Blockchain, w *wallet.Wallets) *StateManager {
 		Blockchain:  b,
 		Wallets:     w,
 		UtxoSet:     utxoSet,
+		store:       b.Store,
 		selfLock:    sync.RWMutex{},
 		accountLock: sync.RWMutex{},
 	}
@@ -44,6 +47,14 @@ func (s *StateManager) LockAccounts() {
 
 func (s *StateManager) UnlockAccounts() {
 	s.accountLock.Unlock()
+}
+
+func (s *StateManager) Close() error {
+	return s.store.Close()
+}
+
+func (s *StateManager) GetLatestBlockHeight() uint32 {
+	return s.Blockchain.CurrHeight
 }
 
 func (s *StateManager) GetBalance(addr wallet.Address) (int, error) {

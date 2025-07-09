@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -33,14 +32,14 @@ func TestWalletsFile(t *testing.T) {
 		walletSet[address] = wallet
 	}
 	wallets := Wallets{
-		Wallets:      walletSet,
-		SaveFilePath: fmt.Sprintf("%s/wallets.json", temp_dir),
+		Wallets: walletSet,
+		FileDir: temp_dir,
 	}
 	err := wallets.SaveToFile()
 	if err != nil {
 		t.Error(err)
 	}
-	walletsFromFile, err := LoadWalletsFromFile(wallets.SaveFilePath)
+	walletsFromFile, err := LoadWalletsFromFile(wallets.FileDir)
 	if err != nil {
 		t.Error(err)
 	}

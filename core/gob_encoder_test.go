@@ -9,8 +9,8 @@ import (
 
 func TestGobEncoderDecoder(t *testing.T) {
 	wallets := &wallet.Wallets{
-		Wallets:      map[wallet.Address]*wallet.Wallet{},
-		SaveFilePath: "wallets.json",
+		Wallets: map[wallet.Address]*wallet.Wallet{},
+		FileDir: "",
 	}
 	bob, err := wallets.AddWallet()
 	assert.NoError(t, err)
@@ -20,7 +20,7 @@ func TestGobEncoderDecoder(t *testing.T) {
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
 	assert.NoError(t, err)
 
-	block, err := NewBlock(nil, []*Transaction{coinbase})
+	block, err := NewBlock(nil, []*Transaction{coinbase}, 2)
 	assert.NoError(t, err)
 
 	gobEncoder := GobEncoder[Block]{}

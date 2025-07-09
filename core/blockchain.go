@@ -13,6 +13,12 @@ type Blockchain struct {
 	Store          Store
 	Head           BlockHash
 	CurrDifficulty uint32
+	CurrHeight     uint32
+}
+
+func InitBlockchain(store Store) {
+	// TODO: Handle fetching the blockchain from the store
+	// setting the CurrHeight
 }
 
 func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
@@ -25,6 +31,7 @@ func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*B
 		Store:          store,
 		Head:           genesis.GetHash(),
 		CurrDifficulty: uint32(difficulty),
+		CurrHeight:     1, // Because of the genesis block
 	}, nil
 }
 
@@ -45,7 +52,7 @@ func (b *Blockchain) Iterate() func(func(*Block) bool) {
 }
 
 func (b *Blockchain) NewBlock(transactions []*Transaction) (*Block, error) {
-	return NewBlock(b.Head, transactions)
+	return NewBlock(b.Head, transactions, b.CurrHeight)
 }
 
 func (b *Blockchain) NewPOW() *POW {
@@ -54,5 +61,6 @@ func (b *Blockchain) NewPOW() *POW {
 
 func (b *Blockchain) AddBlock(block *Block) error {
 	b.Head = block.GetHash()
+	b.CurrHeight++
 	return b.Store.PutBlock(block)
 }

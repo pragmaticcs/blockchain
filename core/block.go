@@ -21,6 +21,7 @@ type BlockHeader struct {
 	Time       int64
 	Nonce      int32
 	Difficulty uint32
+	Height     uint32
 }
 
 type BlockBody struct {
@@ -32,7 +33,7 @@ type Block struct {
 	BlockBody
 }
 
-func NewBlock(prevHash []byte, transactions []*Transaction) (*Block, error) {
+func NewBlock(prevHash []byte, transactions []*Transaction, prevHeight uint32) (*Block, error) {
 	blockBody := BlockBody{
 		Transactions: transactions,
 	}
@@ -42,11 +43,13 @@ func NewBlock(prevHash []byte, transactions []*Transaction) (*Block, error) {
 	}
 	block := &Block{
 		BlockHeader: BlockHeader{
+			Version:    CurrentVersion,
 			PrevHash:   prevHash,
 			MerkleRoot: merkleTree.Root,
 			Time:       time.Now().Unix(),
 			Nonce:      0,
 			Difficulty: 0,
+			Height:     prevHeight + 1,
 		},
 		BlockBody: blockBody,
 	}
@@ -69,7 +72,8 @@ func (b *BlockHeader) GetData() []byte {
 		b.MerkleRoot,
 		GetHexValue(b.Time),
 		GetHexValue(int64(b.Nonce)),
-		GetHexValue(int64(b.Difficulty))},
+		GetHexValue(int64(b.Difficulty)),
+		GetHexValue(int64(b.Height))},
 		[]byte{})
 	return data
 }
@@ -94,5 +98,5 @@ func CreateGenesisBlock(value int, to crypto.PubKey) (*Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBlock([]byte{}, []*Transaction{coinbase})
+	return NewBlock([]byte{}, []*Transaction{coinbase}, 0)
 }

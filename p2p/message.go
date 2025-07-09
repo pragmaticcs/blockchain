@@ -6,33 +6,28 @@ import (
 	"io"
 )
 
-const messageMagic uint32 = 0xf4e7a92c
-
-type RpcCommand uint16
-
 const (
-	RpcCommandVersion RpcCommand = iota
-	RpcCommandAddr
-	RpcCommandBlock
-	RpcCommandTx
+	msgMagic uint32 = 0xf4e7a92c
+	msgPayloadMaxLength
 )
 
 type MessageHeader struct {
 	Magic   uint32
 	Command RpcCommand
 	Length  uint32
-	// TODO: add checksum
+	// TODO: add checksum for the payload
 	// Checksum [4]byte
 }
 
 type Message struct {
+	// Message is what is sent through the network
 	Header  MessageHeader
 	Payload []byte
 }
 
 func NewMessage(payload []byte, command RpcCommand) *Message {
 	header := MessageHeader{
-		Magic:   messageMagic,
+		Magic:   msgMagic,
 		Command: command,
 		Length:  uint32(len(payload)),
 	}
@@ -61,7 +56,7 @@ func (d *MessageDecoder) Decode() (*Message, error) {
 	}
 
 	magic := header.Magic
-	if magic != messageMagic {
+	if magic != msgMagic {
 		return nil, NewMessageError(fmt.Sprintf("invalid magic number %x", header.Magic))
 	}
 
@@ -96,6 +91,11 @@ func (e *MessageEncoder) Encode(msg *Message) error {
 	}
 	_, err = e.w.Write(msg.Payload)
 	return err
+}
+
+type MessageVersion struct {
+	ProtocolVersion   uint32
+	LatestBlockHeight uint32
 }
 
 type MessageError struct {

@@ -11,8 +11,8 @@ import (
 func TestBlockChain(t *testing.T) {
 	tempDir := t.TempDir()
 	wallets := &wallet.Wallets{
-		Wallets:      map[wallet.Address]*wallet.Wallet{},
-		SaveFilePath: "wallets.json",
+		Wallets: map[wallet.Address]*wallet.Wallet{},
+		FileDir: "",
 	}
 	bob, err := wallets.AddWallet()
 	assert.NoError(t, err)

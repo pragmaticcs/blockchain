@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -12,9 +13,9 @@ var (
 )
 
 type Wallets struct {
-	// For storing all wallets (currently for testing purposes)
-	Wallets      map[Address]*Wallet
-	SaveFilePath string
+	// For storing wallets of a node
+	Wallets map[Address]*Wallet
+	FileDir string
 }
 
 func (w *Wallets) GetWallet(addr Address) (*Wallet, error) {
@@ -34,16 +35,20 @@ func (w *Wallets) GetAllAddresses() []Address {
 	return addresses
 }
 
-func InitWallets(saveFilePath string) (*Wallets, error) {
-	wallets, err := LoadWalletsFromFile(saveFilePath)
+func InitWallets(FileDir string) (*Wallets, error) {
+	wallets, err := LoadWalletsFromFile(FileDir)
 	if wallets == nil {
 		// If the file doesn't exist - return empty struct
 		wallets = &Wallets{
-			Wallets:      map[Address]*Wallet{},
-			SaveFilePath: saveFilePath,
+			Wallets: map[Address]*Wallet{},
+			FileDir: FileDir,
 		}
 	}
 	return wallets, err
+}
+
+func (w *Wallets) getFilePath() string {
+	return fmt.Sprintf("%s/wallets.json", w.FileDir)
 }
 
 func (w *Wallets) SaveToFile() error {
@@ -53,14 +58,15 @@ func (w *Wallets) SaveToFile() error {
 	if err := encoder.Encode(w); err != nil {
 		return err
 	}
-	return os.WriteFile(w.SaveFilePath, buf.Bytes(), 0644)
+	return os.WriteFile(w.getFilePath(), buf.Bytes(), 0644)
 }
 
-func LoadWalletsFromFile(saveFilePath string) (*Wallets, error) {
-	if _, err := os.Stat(saveFilePath); os.IsNotExist(err) {
+func LoadWalletsFromFile(FileDir string) (*Wallets, error) {
+	if _, err := os.Stat(FileDir); os.IsNotExist(err) {
 		return nil, nil
 	}
-	fileBytes, err := os.ReadFile(saveFilePath)
+	filePath := fmt.Sprintf("%s/wallets.json", FileDir)
+	fileBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
