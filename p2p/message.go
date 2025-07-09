@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/pragmaticcs/blockchain/utils"
 )
 
 const (
@@ -96,6 +98,17 @@ func (e *MessageEncoder) Encode(msg *Message) error {
 type MessageVersion struct {
 	ProtocolVersion   uint32
 	LatestBlockHeight uint32
+}
+
+func (msg *MessageVersion) ToBytes() []byte {
+	encoder := utils.GobEncoderDecoder[MessageVersion]{}
+	msgBytes, _ := encoder.Encode(msg)
+	return msgBytes
+}
+
+func (msg *Message) VisitAsMessageVersion() (*MessageVersion, error) {
+	decoder := utils.GobEncoderDecoder[MessageVersion]{}
+	return decoder.Decode(msg.Payload)
 }
 
 type MessageError struct {

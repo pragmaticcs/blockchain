@@ -8,9 +8,12 @@ import (
 	"sync"
 )
 
-type Handshake func()
+var NopHandshakeFunc HandshakeFunc = func(p Peer) error {
+	return nil
+}
 
 type TCPPeer struct {
+	// Implements the Peer interface
 	net.Conn
 }
 
@@ -25,9 +28,14 @@ func (t *TCPPeer) Send(data []byte) error {
 	return err
 }
 
+func (t *TCPPeer) GetAddr() string {
+	return t.LocalAddr().String()
+}
+
 type TCPTransportOpts struct {
 	ListenAddr string
 	SeedPeers  []string
+	Handshake  HandshakeFunc
 }
 
 // Implements the Transport interface
@@ -105,6 +113,14 @@ func (t *TCPTransport) Bootstrap() {
 
 func (t *TCPTransport) HandleConn(conn net.Conn) {
 	peer := NewTCPPeer(conn)
+
+	err := t.Handshake(peer)
+	if err != nil {
+		log.Printf("handshake with %s failed: %v", conn.RemoteAddr(), err)
+		_ = peer.Close()
+		return
+	}
+
 	t.AddPeer(peer)
 
 	defer func() {
@@ -112,6 +128,7 @@ func (t *TCPTransport) HandleConn(conn net.Conn) {
 		t.RemovePeer(peer)
 		_ = peer.Close()
 	}()
+
 	t.readLoop(peer)
 }
 

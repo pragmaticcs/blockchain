@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/pragmaticcs/blockchain/utils"
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -31,9 +32,9 @@ var (
 
 type BadgerStore struct {
 	// Implements Store interface
-	DB           *badger.DB
-	BlockEncoder BlockEncoder
-	UtxoEncoder  UtxoEncoder
+	DB                  *badger.DB
+	BlockEncoderDecoder BlockEncoderDecoder
+	UtxoEncoderDecoder  UtxoEncoderDecoder
 }
 
 func NewBadgerStore(path string) (*BadgerStore, error) {
@@ -43,9 +44,9 @@ func NewBadgerStore(path string) (*BadgerStore, error) {
 		return nil, err
 	}
 	return &BadgerStore{
-		DB:           db,
-		BlockEncoder: GobEncoder[Block]{},
-		UtxoEncoder:  GobEncoder[TxOutput]{},
+		DB:                  db,
+		BlockEncoderDecoder: utils.GobEncoderDecoder[Block]{},
+		UtxoEncoderDecoder:  utils.GobEncoderDecoder[TxOutput]{},
 	}, nil
 }
 
@@ -63,11 +64,11 @@ func (b *BadgerStore) GetBlock(hash BlockHash) (*Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.BlockEncoder.Decode(value)
+	return b.BlockEncoderDecoder.Decode(value)
 }
 
 func (b *BadgerStore) PutBlock(block *Block) error {
-	value, err := b.BlockEncoder.Encode(block)
+	value, err := b.BlockEncoderDecoder.Encode(block)
 	if err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func (b *BadgerStore) PutUTXOs(utxos UTXOs) error {
 				return err
 			}
 			key = utxoPrefix.ConstructKey(key)
-			value, err := b.UtxoEncoder.Encode(&utxo)
+			value, err := b.UtxoEncoderDecoder.Encode(&utxo)
 			if err != nil {
 				return err
 			}
@@ -133,7 +134,7 @@ func (b *BadgerStore) PutDeleteUTXOs(put UTXOs, delete []OutPoint) error {
 				return err
 			}
 			key = utxoPrefix.ConstructKey(key)
-			value, err := b.UtxoEncoder.Encode(&utxo)
+			value, err := b.UtxoEncoderDecoder.Encode(&utxo)
 			if err != nil {
 				return err
 			}
@@ -178,7 +179,7 @@ func (b *BadgerStore) ForEachUTXO(fn func(outPoint OutPoint, out TxOutput) error
 
 			var utxo *TxOutput
 			err = item.Value(func(val []byte) error {
-				value, err := b.UtxoEncoder.Decode(val)
+				value, err := b.UtxoEncoderDecoder.Decode(val)
 				if err != nil {
 					return err
 				}

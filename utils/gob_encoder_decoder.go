@@ -1,14 +1,14 @@
-package core
+package utils
 
 import (
 	"bytes"
 	"encoding/gob"
 )
 
-type GobEncoder[T any] struct {
+type GobEncoderDecoder[T any] struct {
 }
 
-func (enc GobEncoder[T]) Encode(obj *T) ([]byte, error) {
+func (enc GobEncoderDecoder[T]) Encode(obj *T) ([]byte, error) {
 	var b []byte
 	buf := bytes.NewBuffer(b)
 	encoder := gob.NewEncoder(buf)
@@ -19,7 +19,7 @@ func (enc GobEncoder[T]) Encode(obj *T) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (enc GobEncoder[T]) Decode(data []byte) (*T, error) {
+func (enc GobEncoderDecoder[T]) Decode(data []byte) (*T, error) {
 	var obj T
 	buf := bytes.NewBuffer(data)
 	decoder := gob.NewDecoder(buf)
