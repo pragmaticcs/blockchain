@@ -101,16 +101,38 @@ type MessageVersion struct {
 }
 
 func (msg *MessageVersion) ToBytes() []byte {
-	encoder := utils.GobEncoderDecoder[MessageVersion]{}
-	msgBytes, _ := encoder.Encode(msg)
-	return msgBytes
+	return utils.EncodeInBinary(msg)
 }
 
 func (msg *Message) VisitAsMessageVersion() (*MessageVersion, error) {
-	decoder := utils.GobEncoderDecoder[MessageVersion]{}
-	return decoder.Decode(msg.Payload)
+	return utils.DecodeInBinary[MessageVersion](msg.Payload)
 }
 
+type MessageAddr struct {
+	AddrList []string
+}
+
+func (msg *MessageAddr) ToBytes() []byte {
+	return utils.EncodeInBinary(msg)
+}
+
+func (msg *Message) VisitAsMessageAddr() (*MessageAddr, error) {
+	return utils.DecodeInBinary[MessageAddr](msg.Payload)
+}
+
+type MessageGetBlocks struct {
+	LatestHash []byte
+}
+
+func (msg *MessageGetBlocks) ToBytes() []byte {
+	return utils.EncodeInBinary(msg)
+}
+
+func (msg *Message) VisitAsMessageGetBlocks() (*MessageGetBlocks, error) {
+	return utils.DecodeInBinary[MessageGetBlocks](msg.Payload)
+}
+
+// Errors for the message module
 type MessageError struct {
 	Err string
 }

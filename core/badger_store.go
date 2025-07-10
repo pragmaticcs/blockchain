@@ -26,8 +26,9 @@ func (b BadgerPrefix) DeconstructKey(key []byte) []byte {
 }
 
 var (
-	blockPrefix = NewBadgerPrefix([]byte("block-"))
-	utxoPrefix  = NewBadgerPrefix([]byte("utxo-"))
+	blockPrefix       = NewBadgerPrefix([]byte("block-"))
+	utxoPrefix        = NewBadgerPrefix([]byte("utxo-"))
+	blockchainHeadKey = []byte("blockchainhead")
 )
 
 type BadgerStore struct {
@@ -75,6 +76,35 @@ func (b *BadgerStore) PutBlock(block *Block) error {
 	key := blockPrefix.ConstructKey(block.GetHash())
 	return b.DB.Update(func(txn *badger.Txn) error {
 		return txn.Set(key, value)
+	})
+}
+
+func (b *BadgerStore) GetBlockchainHead() (*Block, error) {
+	var value []byte
+	err := b.DB.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(blockchainHeadKey)
+		if err != nil {
+			return err
+		}
+		value, err = item.ValueCopy(value)
+		return err
+	})
+	if err == badger.ErrKeyNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return b.BlockEncoderDecoder.Decode(value)
+}
+
+func (b *BadgerStore) SetBlockchainHead(block *Block) error {
+	value, err := b.BlockEncoderDecoder.Encode(block)
+	if err != nil {
+		return err
+	}
+	return b.DB.Update(func(txn *badger.Txn) error {
+		return txn.Set(blockchainHeadKey, value)
 	})
 }
 

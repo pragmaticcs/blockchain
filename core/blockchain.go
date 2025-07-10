@@ -10,15 +10,23 @@ type GenesisConfig struct {
 }
 
 type Blockchain struct {
-	Store          Store
-	Head           BlockHash
-	CurrDifficulty uint32
-	CurrHeight     uint32
+	Store      Store
+	Head       BlockHash
+	CurrHeight uint32
 }
 
-func InitBlockchain(store Store) {
+func InitBlockchain(store Store) (*Blockchain, error) {
 	// TODO: Handle fetching the blockchain from the store
 	// setting the CurrHeight
+	head, err := store.GetBlockchainHead()
+	if err != nil {
+		return nil, err
+	}
+	return &Blockchain{
+		Store:      store,
+		Head:       head.GetHash(),
+		CurrHeight: head.Height,
+	}, nil
 }
 
 func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
@@ -27,11 +35,11 @@ func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*B
 		return nil, err
 	}
 	store.PutBlock(genesis)
+	store.SetBlockchainHead(genesis)
 	return &Blockchain{
-		Store:          store,
-		Head:           genesis.GetHash(),
-		CurrDifficulty: uint32(difficulty),
-		CurrHeight:     1, // Because of the genesis block
+		Store:      store,
+		Head:       genesis.GetHash(),
+		CurrHeight: 1, // Because of the genesis block
 	}, nil
 }
 
@@ -55,12 +63,12 @@ func (b *Blockchain) NewBlock(transactions []*Transaction) (*Block, error) {
 	return NewBlock(b.Head, transactions, b.CurrHeight)
 }
 
-func (b *Blockchain) NewPOW() *POW {
-	return NewPOW(b.CurrDifficulty)
-}
-
 func (b *Blockchain) AddBlock(block *Block) error {
 	b.Head = block.GetHash()
 	b.CurrHeight++
-	return b.Store.PutBlock(block)
+	err := b.Store.PutBlock(block)
+	if err != nil {
+		return err
+	}
+	return b.Store.SetBlockchainHead(block)
 }

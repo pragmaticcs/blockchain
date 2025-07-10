@@ -9,16 +9,18 @@ import (
 )
 
 type NodeOpts struct {
-	Port          string
-	SeedNodes     []string
-	WalletFileDir string
+	Port                  string
+	SeedNodes             []string
+	WalletFileDir         string
+	BlockchainDatabaseDir string
 }
 
 func DefaultNodeOpts() NodeOpts {
 	return NodeOpts{
-		Port:          "3000",
-		SeedNodes:     nil,
-		WalletFileDir: "", // Save to current directory
+		Port:                  "3000",
+		SeedNodes:             nil,
+		WalletFileDir:         "", // Save to current directory
+		BlockchainDatabaseDir: "badger",
 	}
 }
 
@@ -31,7 +33,7 @@ type Node struct {
 	quit chan struct{}
 }
 
-func NewNode(opts NodeOpts, b *Blockchain, w *wallet.Wallets) *Node {
+func NewNode(opts NodeOpts) (*Node, error) {
 	var node Node
 
 	transportOpts := p2p.TCPTransportOpts{
@@ -40,7 +42,36 @@ func NewNode(opts NodeOpts, b *Blockchain, w *wallet.Wallets) *Node {
 		Handshake:  node.Handshake,
 	}
 	transport := p2p.NewTCPTransport(transportOpts)
+	store, err := NewBadgerStore(opts.BlockchainDatabaseDir)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't connect to the database: %s", err))
+	}
+	blockchain, err := InitBlockchain(store)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the blockchain: %s", err))
+	}
+	wallets, err := wallet.InitWallets(opts.WalletFileDir)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize wallets: %s", err))
+	}
+	stateManager := NewStateManager(blockchain, wallets)
 
+	node.Transport = transport
+	node.StateManager = stateManager
+	node.quit = make(chan struct{})
+	node.Mempool = nil
+	return &node, err
+}
+
+func NewNodeTesting(opts NodeOpts, b *Blockchain, w *wallet.Wallets) *Node {
+	var node Node
+
+	transportOpts := p2p.TCPTransportOpts{
+		ListenAddr: opts.Port,
+		SeedPeers:  opts.SeedNodes,
+		Handshake:  node.Handshake,
+	}
+	transport := p2p.NewTCPTransport(transportOpts)
 	stateManager := NewStateManager(b, w)
 
 	node.Transport = transport
@@ -51,22 +82,19 @@ func NewNode(opts NodeOpts, b *Blockchain, w *wallet.Wallets) *Node {
 }
 
 func (n *Node) Start() error {
-	defer n.Stop()
-
 	err := n.Transport.Start()
 	if err != nil {
 		return err
 	}
 
-	defer n.Transport.Close()
-
-	n.MainLoop()
-	return nil
+	return n.MainLoop()
 }
 
 func (n *Node) Stop() {
 	// Handles graceful shutdown
-	n.StateManager.Close()
+	_ = n.Transport.Close()
+	_ = n.StateManager.Close()
+
 }
 
 func (n *Node) sendQuitSignal() {
@@ -74,13 +102,16 @@ func (n *Node) sendQuitSignal() {
 	n.quit <- struct{}{}
 }
 
-func (n *Node) MainLoop() {
+func (n *Node) MainLoop() error {
 	for {
 		select {
 		case rpc := <-n.Transport.RpcCh:
-			n.HandleRpc(rpc)
-		case _ = <-n.quit:
-			return
+			err := n.HandleRpc(rpc)
+			if err != nil {
+				return err
+			}
+		case <-n.quit:
+			return nil
 		}
 	}
 }
@@ -127,11 +158,19 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 		return NewNodeError("peer protocol version is different from own")
 	}
 
+	// log.Printf("Message version from peer %s: %+v\n", peer.GetAddr(), theirMsgVersion)
+
 	if theirMsgVersion.LatestBlockHeight > n.StateManager.GetLatestBlockHeight() {
 		// TODO: Send request for blocks to sync
+		n.Sync(peer)
 	}
 
 	log.Printf("handshake successful with peer %s", peer.GetAddr())
+	return nil
+}
+
+func (n *Node) Sync(peer p2p.Peer) error {
+	log.Println("syncing with peer")
 	return nil
 }
 

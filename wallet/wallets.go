@@ -39,10 +39,10 @@ func InitWallets(FileDir string) (*Wallets, error) {
 	wallets, err := LoadWalletsFromFile(FileDir)
 	if wallets == nil {
 		// If the file doesn't exist - return empty struct
-		wallets = &Wallets{
+		return &Wallets{
 			Wallets: map[Address]*Wallet{},
 			FileDir: FileDir,
-		}
+		}, nil
 	}
 	return wallets, err
 }

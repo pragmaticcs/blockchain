@@ -6,6 +6,8 @@ type Store interface {
 	// a blockchain is immutable by design
 	PutBlock(block *Block) error
 	GetBlock(hash BlockHash) (*Block, error)
+	GetBlockchainHead() (*Block, error)
+	SetBlockchainHead(block *Block) error
 
 	// UTXO operations
 	ForEachUTXO(fn func(outPoint OutPoint, out TxOutput) error) error

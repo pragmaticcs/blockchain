@@ -29,7 +29,7 @@ func (t *TCPPeer) Send(data []byte) error {
 }
 
 func (t *TCPPeer) GetAddr() string {
-	return t.LocalAddr().String()
+	return t.RemoteAddr().String()
 }
 
 type TCPTransportOpts struct {
@@ -100,6 +100,9 @@ func (t *TCPTransport) Connect(addr string) (net.Conn, error) {
 }
 
 func (t *TCPTransport) Bootstrap() {
+	if t.SeedPeers == nil {
+		return
+	}
 	for _, addr := range t.SeedPeers {
 		conn, err := t.Connect(addr)
 		if err != nil {
@@ -114,17 +117,19 @@ func (t *TCPTransport) Bootstrap() {
 func (t *TCPTransport) HandleConn(conn net.Conn) {
 	peer := NewTCPPeer(conn)
 
+	log.Println("Trying to handshake")
 	err := t.Handshake(peer)
 	if err != nil {
-		log.Printf("handshake with %s failed: %v", conn.RemoteAddr(), err)
+		log.Printf("handshake with %s failed: %v", peer.GetAddr(), err)
 		_ = peer.Close()
 		return
 	}
+	log.Printf("handshake with %s successful", peer.GetAddr())
 
 	t.AddPeer(peer)
 
 	defer func() {
-		log.Printf("dropping peer: %s", peer.RemoteAddr().String())
+		log.Printf("dropping peer: %s", peer.GetAddr())
 		t.RemovePeer(peer)
 		_ = peer.Close()
 	}()
@@ -137,11 +142,11 @@ func (t *TCPTransport) readLoop(peer *TCPPeer) {
 	for {
 		msg, err := decoder.Decode()
 		if err != nil {
-			log.Printf("read error from %s: %v", peer.RemoteAddr().String(), err)
+			log.Printf("read error from %s: %v", peer.GetAddr(), err)
 			break
 		}
 		t.RpcCh <- RPC{
-			From:    peer.RemoteAddr().String(),
+			From:    peer.GetAddr(),
 			Payload: msg.Payload,
 			Command: msg.Header.Command,
 		}
@@ -166,11 +171,11 @@ func (t *TCPTransport) Broadcast(payload []byte, command RpcCommand) {
 func (t *TCPTransport) AddPeer(peer *TCPPeer) {
 	t.PeerLock.Lock()
 	defer t.PeerLock.Unlock()
-	t.Peers[peer.RemoteAddr().String()] = peer
+	t.Peers[peer.GetAddr()] = peer
 }
 
 func (t *TCPTransport) RemovePeer(peer *TCPPeer) {
 	t.PeerLock.Lock()
 	defer t.PeerLock.Unlock()
-	delete(t.Peers, peer.RemoteAddr().String())
+	delete(t.Peers, peer.GetAddr())
 }

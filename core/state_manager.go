@@ -8,12 +8,19 @@ import (
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
+// Just for testing purposes
+const (
+	defaultDifficulty = 20
+)
+
 type StateManager struct {
 	Blockchain *Blockchain
 	UtxoSet    *UTXOset
 	Wallets    *wallet.Wallets
 	// Copy of pointer to store to handle closing
 	store Store
+
+	miningDifficulty uint32
 
 	// Mutexes
 	selfLock    sync.RWMutex // Use when modifying the state of blockchain itself
@@ -24,12 +31,13 @@ func NewStateManager(b *Blockchain, w *wallet.Wallets) *StateManager {
 	utxoSet := NewUTXOset(b, b.Store)
 	utxoSet.Reindex()
 	return &StateManager{
-		Blockchain:  b,
-		Wallets:     w,
-		UtxoSet:     utxoSet,
-		store:       b.Store,
-		selfLock:    sync.RWMutex{},
-		accountLock: sync.RWMutex{},
+		Blockchain:       b,
+		Wallets:          w,
+		UtxoSet:          utxoSet,
+		store:            b.Store,
+		miningDifficulty: defaultDifficulty,
+		selfLock:         sync.RWMutex{},
+		accountLock:      sync.RWMutex{},
 	}
 }
 
@@ -122,7 +130,8 @@ func (s *StateManager) Mine(transactions []*Transaction) (*Block, error) {
 		return nil, err
 	}
 	// Run the proof of work
-	pow := s.Blockchain.NewPOW()
+	// TODO: Implement a calculateDifficulty function
+	pow := NewPOW(s.miningDifficulty)
 
 	// TODO: handle if couldn't mine the block
 	_ = pow.Run(block)
