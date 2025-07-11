@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pragmaticcs/blockchain/crypto"
 	"github.com/pragmaticcs/blockchain/wallet"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,20 +19,21 @@ func TestBadgerStore(t *testing.T) {
 	assert.NoError(t, err)
 	bobsWallet, err := wallets.GetWallet(bob)
 	assert.NoError(t, err)
-	difficulty := 16
-	genesisConf := GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
+	pubKeyHash, err := crypto.HashPublicKey(bobsWallet.PublicKey)
+	assert.NoError(t, err)
+	genesisConf := GenesisConfig{Amount: 50, PubKeyHash: pubKeyHash}
 
 	store, err := NewBadgerStore(fmt.Sprintf("%s/badger", tempDir))
 
 	assert.NoError(t, err)
 	defer store.Close()
 
-	bch, err := NewBlockchain(difficulty, genesisConf, store)
+	bch, err := NewBlockchain(genesisConf, store)
 	assert.NoError(t, err)
 
 	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
 	assert.NoError(t, err)
-	block, err := bch.NewBlock([]*Transaction{coinbase})
+	block, err := bch.NewBlock([]Transaction{*coinbase})
 	assert.NoError(t, err)
 	err = bch.AddBlock(block)
 	assert.NoError(t, err)

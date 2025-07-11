@@ -10,13 +10,13 @@ import (
 
 // Just for testing purposes
 const (
-	defaultDifficulty = 20
+	DefaultDifficulty = 20
 )
 
 type StateManager struct {
 	Blockchain *Blockchain
 	UtxoSet    *UTXOset
-	Wallets    *wallet.Wallets
+	Wallet     *wallet.Wallet
 	// Copy of pointer to store to handle closing
 	store Store
 
@@ -27,15 +27,15 @@ type StateManager struct {
 	accountLock sync.RWMutex // Use when modifying the state of accounts/wallets
 }
 
-func NewStateManager(b *Blockchain, w *wallet.Wallets) *StateManager {
+func NewStateManager(b *Blockchain, w *wallet.Wallet) *StateManager {
 	utxoSet := NewUTXOset(b, b.Store)
 	utxoSet.Reindex()
 	return &StateManager{
 		Blockchain:       b,
-		Wallets:          w,
+		Wallet:           w,
 		UtxoSet:          utxoSet,
 		store:            b.Store,
-		miningDifficulty: defaultDifficulty,
+		miningDifficulty: DefaultDifficulty,
 		selfLock:         sync.RWMutex{},
 		accountLock:      sync.RWMutex{},
 	}
@@ -65,28 +65,23 @@ func (s *StateManager) GetLatestBlockHeight() uint32 {
 	return s.Blockchain.CurrHeight
 }
 
-func (s *StateManager) GetBalance(addr wallet.Address) (int, error) {
-	wallet, err := s.Wallets.GetWallet(addr)
-	if err != nil {
-		return -1, err
-	}
-	pubKeyHash, err := crypto.HashPublicKey(wallet.PublicKey)
+func (s *StateManager) GetBalance() (int, error) {
+	pubKeyHash, err := crypto.HashPublicKey(s.Wallet.PublicKey)
 	if err != nil {
 		return -1, err
 	}
 	return s.UtxoSet.FindSpendableAmount(pubKeyHash)
-
 }
 
-func (s *StateManager) NewTransaction(from, to wallet.Address, amount int) (*Transaction, error) {
+func (s *StateManager) NewTransaction(to wallet.Address, amount int) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
-	sender, err := s.Wallets.GetWallet(from)
+	selfAddress, err := s.Wallet.GetAddress()
 	if err != nil {
 		return nil, err
 	}
-	pubKeyHash, err := crypto.HashPublicKey(sender.PublicKey)
+	pubKeyHash, err := crypto.HashPublicKey(s.Wallet.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +94,13 @@ func (s *StateManager) NewTransaction(from, to wallet.Address, amount int) (*Tra
 			TxID:   outPoint.TxID,
 			OutID:  outPoint.OutID,
 			Sig:    nil,
-			PubKey: sender.PublicKey,
+			PubKey: s.Wallet.PublicKey,
 		}
 		inputs = append(inputs, in)
 	}
 	outputs = append(outputs, *NewTxOutput(amount, []byte(to))) // Transfer to reciever
 	if sum > int64(amount) {
-		outputs = append(outputs, *NewTxOutput(int(sum)-amount, []byte(from))) // Transfer change back
+		outputs = append(outputs, *NewTxOutput(int(sum)-amount, []byte(selfAddress))) // Transfer change back
 	}
 
 	tx := &Transaction{
@@ -116,7 +111,7 @@ func (s *StateManager) NewTransaction(from, to wallet.Address, amount int) (*Tra
 	txID := tx.GetHash()
 	tx.ID = txID
 
-	err = s.Blockchain.SignTransaction(tx, sender.PrivateKey)
+	err = s.Blockchain.SignTransaction(tx, s.Wallet.PrivateKey)
 
 	if err != nil {
 		return nil, err
@@ -124,7 +119,7 @@ func (s *StateManager) NewTransaction(from, to wallet.Address, amount int) (*Tra
 	return tx, nil
 }
 
-func (s *StateManager) Mine(transactions []*Transaction) (*Block, error) {
+func (s *StateManager) Mine(transactions []Transaction) (*Block, error) {
 	block, err := s.Blockchain.NewBlock(transactions)
 	if err != nil {
 		return nil, err
@@ -147,13 +142,13 @@ func (s *StateManager) Update(block *Block) error {
 	return s.UtxoSet.Update(block)
 }
 
-func (s *StateManager) Send(from, to wallet.Address, amount int) error {
-	tx, err := s.NewTransaction(from, to, amount)
+func (s *StateManager) Send(to wallet.Address, amount int) error {
+	tx, err := s.NewTransaction(to, amount)
 	if err != nil {
 		return err
 	}
 	fmt.Println("Mining new block with transactions")
-	block, err := s.Mine([]*Transaction{tx})
+	block, err := s.Mine([]Transaction{*tx})
 	if err != nil {
 		return err
 	}

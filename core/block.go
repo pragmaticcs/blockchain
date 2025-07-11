@@ -6,8 +6,6 @@ import (
 	"encoding/binary"
 	"log"
 	"time"
-
-	"github.com/pragmaticcs/blockchain/crypto"
 )
 
 const CurrentVersion uint32 = 1
@@ -25,7 +23,7 @@ type BlockHeader struct {
 }
 
 type BlockBody struct {
-	Transactions []*Transaction
+	Transactions []Transaction
 }
 
 type Block struct {
@@ -33,7 +31,7 @@ type Block struct {
 	BlockBody
 }
 
-func NewBlock(prevHash []byte, transactions []*Transaction, prevHeight uint32) (*Block, error) {
+func NewBlock(prevHash []byte, transactions []Transaction, prevHeight uint32) (*Block, error) {
 	blockBody := BlockBody{
 		Transactions: transactions,
 	}
@@ -65,7 +63,7 @@ func (b *BlockBody) GetMerkleTree() (*MerkleTree, error) {
 }
 
 func (b *BlockHeader) GetData() []byte {
-	// Converts block into bytes
+	// Converts block header into bytes
 	data := bytes.Join([][]byte{
 		GetHexValue(int64(b.Version)),
 		b.PrevHash[:],
@@ -93,10 +91,10 @@ func GetHexValue(i int64) []byte {
 	return buf.Bytes()
 }
 
-func CreateGenesisBlock(value int, to crypto.PubKey) (*Block, error) {
-	coinbase, err := NewCoinbase(int64(value), to)
+func CreateGenesisBlock(value int, pubKeyHash []byte) (*Block, error) {
+	coinbase, err := NewCoinbase(int64(value), pubKeyHash)
 	if err != nil {
 		return nil, err
 	}
-	return NewBlock([]byte{}, []*Transaction{coinbase}, 0)
+	return NewBlock([]byte{}, []Transaction{*coinbase}, 0)
 }

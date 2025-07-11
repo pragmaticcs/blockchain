@@ -82,11 +82,7 @@ func (in *TxInput) GetData() []byte {
 	}, []byte{})
 }
 
-func NewCoinbase(value int64, to crypto.PubKey) (*Transaction, error) {
-	pubKeyHash, err := crypto.HashPublicKey(to)
-	if err != nil {
-		return nil, err
-	}
+func NewCoinbase(value int64, pubKeyHash []byte) (*Transaction, error) {
 	txOut := TxOutput{
 		Value:      value,
 		PubKeyHash: pubKeyHash,
@@ -221,7 +217,7 @@ func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
 	for block := range b.Iterate() {
 		for _, tx := range block.Transactions {
 			if tx.ID == id {
-				return tx, nil
+				return &tx, nil
 			}
 		}
 	}

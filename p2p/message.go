@@ -2,9 +2,11 @@ package p2p
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 
+	"github.com/pragmaticcs/blockchain/core"
 	"github.com/pragmaticcs/blockchain/utils"
 )
 
@@ -95,6 +97,7 @@ func (e *MessageEncoder) Encode(msg *Message) error {
 	return err
 }
 
+// Messages:
 type MessageVersion struct {
 	ProtocolVersion   uint32
 	LatestBlockHeight uint32
@@ -102,6 +105,10 @@ type MessageVersion struct {
 
 func (msg *MessageVersion) ToBytes() []byte {
 	return utils.EncodeInBinary(msg)
+}
+
+func (rpc *RPC) VisitAsMessageVersion() (*MessageVersion, error) {
+	return utils.DecodeInBinary[MessageVersion](rpc.Payload)
 }
 
 func (msg *Message) VisitAsMessageVersion() (*MessageVersion, error) {
@@ -116,20 +123,78 @@ func (msg *MessageAddr) ToBytes() []byte {
 	return utils.EncodeInBinary(msg)
 }
 
+func (rpc *RPC) VisitAsMessageAddr() (*MessageAddr, error) {
+	return utils.DecodeInBinary[MessageAddr](rpc.Payload)
+}
+
 func (msg *Message) VisitAsMessageAddr() (*MessageAddr, error) {
 	return utils.DecodeInBinary[MessageAddr](msg.Payload)
 }
 
 type MessageGetBlocks struct {
-	LatestHash []byte
+	From []byte
 }
 
 func (msg *MessageGetBlocks) ToBytes() []byte {
 	return utils.EncodeInBinary(msg)
 }
 
+func (rpc *RPC) VisitAsMessageGetBlocks() (*MessageGetBlocks, error) {
+	return utils.DecodeInBinary[MessageGetBlocks](rpc.Payload)
+}
+
 func (msg *Message) VisitAsMessageGetBlocks() (*MessageGetBlocks, error) {
 	return utils.DecodeInBinary[MessageGetBlocks](msg.Payload)
+}
+
+type InvType uint8
+
+const (
+	InvTypeTx InvType = iota
+	InvTypeBlock
+)
+
+type InvVector struct {
+	Type InvType
+	Hash []byte
+}
+
+func (i *InvVector) ToMapKey() string {
+	data := append([]byte{byte(i.Type)}, i.Hash...)
+	return hex.EncodeToString(data)
+}
+
+type MessageInv struct {
+	Items []InvVector
+}
+
+func (msg *MessageInv) ToBytes() []byte {
+	return utils.EncodeInBinary(msg)
+}
+
+func (rpc *RPC) VisitAsMessageInv() (*MessageInv, error) {
+	return utils.DecodeInBinary[MessageInv](rpc.Payload)
+}
+func (msg *Message) VisitAsMessageInv() (*MessageInv, error) {
+	return utils.DecodeInBinary[MessageInv](msg.Payload)
+}
+
+// Requesting data is the same as announcing you have that data
+type MessageGetData = MessageInv
+
+type MessageBlock struct {
+	Block core.Block
+}
+
+func (msg *MessageBlock) ToBytes() []byte {
+	return utils.EncodeInBinary(msg)
+}
+
+func (rpc *RPC) VisitAsMessageBlock() (*MessageBlock, error) {
+	return utils.DecodeInBinary[MessageBlock](rpc.Payload)
+}
+func (msg *Message) VisitAsMessageBlock() (*MessageBlock, error) {
+	return utils.DecodeInBinary[MessageBlock](msg.Payload)
 }
 
 // Errors for the message module

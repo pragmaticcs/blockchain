@@ -1,26 +1,24 @@
 package core
 
-import (
-	"github.com/pragmaticcs/blockchain/crypto"
-)
-
-type GenesisConfig struct {
-	Amount int
-	To     crypto.PubKey
-}
-
 type Blockchain struct {
 	Store      Store
 	Head       BlockHash
 	CurrHeight uint32
 }
 
-func InitBlockchain(store Store) (*Blockchain, error) {
+func InitBlockchain(store Store, genesisConfDir string) (*Blockchain, error) {
 	// TODO: Handle fetching the blockchain from the store
-	// setting the CurrHeight
+	// and setting the CurrHeight
 	head, err := store.GetBlockchainHead()
 	if err != nil {
 		return nil, err
+	}
+	if head == nil {
+		genesis, err := LoadGenesisConfig(genesisConfDir)
+		if err != nil {
+			return nil, err
+		}
+		return NewBlockchain(*genesis, store)
 	}
 	return &Blockchain{
 		Store:      store,
@@ -29,8 +27,8 @@ func InitBlockchain(store Store) (*Blockchain, error) {
 	}, nil
 }
 
-func NewBlockchain(difficulty int, genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
-	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.To)
+func NewBlockchain(genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
+	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.PubKeyHash)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +57,7 @@ func (b *Blockchain) Iterate() func(func(*Block) bool) {
 	}
 }
 
-func (b *Blockchain) NewBlock(transactions []*Transaction) (*Block, error) {
+func (b *Blockchain) NewBlock(transactions []Transaction) (*Block, error) {
 	return NewBlock(b.Head, transactions, b.CurrHeight)
 }
 

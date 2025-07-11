@@ -2,8 +2,9 @@ package main
 
 import (
 	"log"
+	"os"
 
-	"github.com/pragmaticcs/blockchain/core"
+	"github.com/pragmaticcs/blockchain/node"
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
@@ -68,48 +69,45 @@ func handle(err error) {
 // }
 
 func main() {
-	// Create wallets
-	wallets, err := wallet.InitWallets("")
+	dir, err := os.Getwd()
 	handle(err)
 
-	bob, err := wallets.AddWallet()
-	handle(err)
-	_, err = wallets.AddWallet()
+	// satoshiWallet, err := wallet.LoadWalletFromFile(dir, "satoshi")
+	// handle(err)
+
+	aliceWallet, err := wallet.LoadWalletFromFile(dir, "alice")
 	handle(err)
 
-	bobsWallet, err := wallets.GetWallet(bob)
-	handle(err)
+	aliceAddr, _ := aliceWallet.GetAddress()
 
-	genesisConf := core.GenesisConfig{Amount: 50, To: bobsWallet.PublicKey}
-
-	// Create dbs
-	firstStore, err := core.NewBadgerStore("")
-	handle(err)
-	secondStore, err := core.NewBadgerStore("")
-	handle(err)
-
-	firstBlockchain, err := core.NewBlockchain(20, genesisConf, firstStore)
-	handle(err)
-
-	secondBlockchain, err := core.NewBlockchain(20, genesisConf, secondStore)
-	handle(err)
-
-	firstNodeOpts := core.NodeOpts{
+	firstNodeOpts := node.NodeOpts{
 		Port:                  "localhost:3000",
 		SeedNodes:             nil,
-		WalletFileDir:         "",
-		BlockchainDatabaseDir: "",
+		WalletName:            "satoshi",
+		WalletDir:             dir,
+		BlockchainDatabaseDir: dir,
+		GenesisConfigDir:      dir,
 	}
 
-	secondNodeOpts := core.NodeOpts{
+	secondNodeOpts := node.NodeOpts{
 		Port:                  "localhost:3333",
 		SeedNodes:             []string{"localhost:3000"},
-		WalletFileDir:         "",
-		BlockchainDatabaseDir: "",
+		WalletName:            "alice",
+		WalletDir:             dir,
+		BlockchainDatabaseDir: dir,
+		GenesisConfigDir:      dir,
 	}
 
-	firstNode := core.NewNodeTesting(firstNodeOpts, firstBlockchain, wallets)
-	secondNode := core.NewNodeTesting(secondNodeOpts, secondBlockchain, wallets)
+	firstNode, err := node.NewNode(firstNodeOpts)
+	handle(err)
+
+	// Now the first blockchain is longer then the second
+	err = firstNode.StateManager.Send(aliceAddr, 10)
+	handle(err)
+
+	secondNode, err := node.NewNode(secondNodeOpts)
+	handle(err)
+
 	defer firstNode.Stop()
 	defer secondNode.Stop()
 
