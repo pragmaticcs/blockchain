@@ -120,6 +120,18 @@ func (s *StateManager) Mine(transactions []Transaction) (*Block, error) {
 	return block, err
 }
 
+func (s *StateManager) BlockExists(hash BlockHash) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.store.Exists(hash)
+}
+
+func (s *StateManager) GetBlock(hash BlockHash) (*Block, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.store.GetBlock(hash)
+}
+
 func (s *StateManager) updateUnlocked(block *Block) error {
 	err := s.Blockchain.AddBlock(block)
 	if err != nil {
