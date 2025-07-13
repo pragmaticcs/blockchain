@@ -10,7 +10,7 @@ import (
 
 // Just for testing purposes
 const (
-	DefaultDifficulty = 20
+	DefaultDifficulty = 10
 )
 
 type StateManager struct {
@@ -23,8 +23,7 @@ type StateManager struct {
 	miningDifficulty uint32
 
 	// Mutexes
-	selfLock    sync.RWMutex // Use when modifying the state of blockchain itself
-	accountLock sync.RWMutex // Use when modifying the state of accounts/wallets
+	lock sync.RWMutex // Use when modifying the state of blockchain itself
 }
 
 func NewStateManager(b *Blockchain, w *wallet.Wallet) *StateManager {
@@ -36,25 +35,8 @@ func NewStateManager(b *Blockchain, w *wallet.Wallet) *StateManager {
 		UtxoSet:          utxoSet,
 		store:            b.Store,
 		miningDifficulty: DefaultDifficulty,
-		selfLock:         sync.RWMutex{},
-		accountLock:      sync.RWMutex{},
+		lock:             sync.RWMutex{},
 	}
-}
-
-func (s *StateManager) Lock() {
-	s.selfLock.Lock()
-}
-
-func (s *StateManager) Unlock() {
-	s.selfLock.Unlock()
-}
-
-func (s *StateManager) LockAccounts() {
-	s.accountLock.Lock()
-}
-
-func (s *StateManager) UnlockAccounts() {
-	s.accountLock.Unlock()
 }
 
 func (s *StateManager) Close() error {
@@ -62,10 +44,14 @@ func (s *StateManager) Close() error {
 }
 
 func (s *StateManager) GetLatestBlockHeight() uint32 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	return s.Blockchain.CurrHeight
 }
 
 func (s *StateManager) GetBalance() (int, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	pubKeyHash, err := crypto.HashPublicKey(s.Wallet.PublicKey)
 	if err != nil {
 		return -1, err
@@ -134,7 +120,7 @@ func (s *StateManager) Mine(transactions []Transaction) (*Block, error) {
 	return block, err
 }
 
-func (s *StateManager) Update(block *Block) error {
+func (s *StateManager) updateUnlocked(block *Block) error {
 	err := s.Blockchain.AddBlock(block)
 	if err != nil {
 		return err
@@ -142,7 +128,15 @@ func (s *StateManager) Update(block *Block) error {
 	return s.UtxoSet.Update(block)
 }
 
+func (s *StateManager) Update(block *Block) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.updateUnlocked(block)
+}
+
 func (s *StateManager) Send(to wallet.Address, amount int) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	tx, err := s.NewTransaction(to, amount)
 	if err != nil {
 		return err
@@ -152,5 +146,5 @@ func (s *StateManager) Send(to wallet.Address, amount int) error {
 	if err != nil {
 		return err
 	}
-	return s.Update(block)
+	return s.updateUnlocked(block)
 }

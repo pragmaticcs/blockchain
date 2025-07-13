@@ -23,11 +23,11 @@ func TestTCPTransport(t *testing.T) {
 	defer x.Close()
 	defer y.Close()
 	go func() {
-		err := x.Start()
+		err := x.ListenAndServe()
 		assert.NoError(t, err)
 	}()
 	go func() {
-		err := y.Start()
+		err := y.ListenAndServe()
 		assert.NoError(t, err)
 	}()
 	time.Sleep(time.Second * 3)

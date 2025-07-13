@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	msgMagic uint32 = 0xf4e7a92c
-	msgPayloadMaxLength
+	msgMagic            uint32 = 0xf4e7a92c
+	msgPayloadMaxLength uint32 = 5 * 1024 * 1024
 )
 
 type MessageHeader struct {
@@ -103,48 +103,48 @@ type MessageVersion struct {
 	LatestBlockHeight uint32
 }
 
-func (msg *MessageVersion) ToBytes() []byte {
-	return utils.EncodeInBinary(msg)
+func (msg *MessageVersion) ToBytes() ([]byte, error) {
+	return utils.EncodeInGob(msg)
 }
 
 func (rpc *RPC) VisitAsMessageVersion() (*MessageVersion, error) {
-	return utils.DecodeInBinary[MessageVersion](rpc.Payload)
+	return utils.DecodeInGob[MessageVersion](rpc.Payload)
 }
 
 func (msg *Message) VisitAsMessageVersion() (*MessageVersion, error) {
-	return utils.DecodeInBinary[MessageVersion](msg.Payload)
+	return utils.DecodeInGob[MessageVersion](msg.Payload)
 }
 
 type MessageAddr struct {
 	AddrList []string
 }
 
-func (msg *MessageAddr) ToBytes() []byte {
-	return utils.EncodeInBinary(msg)
+func (msg *MessageAddr) ToBytes() ([]byte, error) {
+	return utils.EncodeInGob(msg)
 }
 
 func (rpc *RPC) VisitAsMessageAddr() (*MessageAddr, error) {
-	return utils.DecodeInBinary[MessageAddr](rpc.Payload)
+	return utils.DecodeInGob[MessageAddr](rpc.Payload)
 }
 
 func (msg *Message) VisitAsMessageAddr() (*MessageAddr, error) {
-	return utils.DecodeInBinary[MessageAddr](msg.Payload)
+	return utils.DecodeInGob[MessageAddr](msg.Payload)
 }
 
 type MessageGetBlocks struct {
-	From []byte
+	From core.BlockHash
 }
 
-func (msg *MessageGetBlocks) ToBytes() []byte {
-	return utils.EncodeInBinary(msg)
+func (msg *MessageGetBlocks) ToBytes() ([]byte, error) {
+	return utils.EncodeInGob(msg)
 }
 
 func (rpc *RPC) VisitAsMessageGetBlocks() (*MessageGetBlocks, error) {
-	return utils.DecodeInBinary[MessageGetBlocks](rpc.Payload)
+	return utils.DecodeInGob[MessageGetBlocks](rpc.Payload)
 }
 
 func (msg *Message) VisitAsMessageGetBlocks() (*MessageGetBlocks, error) {
-	return utils.DecodeInBinary[MessageGetBlocks](msg.Payload)
+	return utils.DecodeInGob[MessageGetBlocks](msg.Payload)
 }
 
 type InvType uint8
@@ -168,15 +168,15 @@ type MessageInv struct {
 	Items []InvVector
 }
 
-func (msg *MessageInv) ToBytes() []byte {
-	return utils.EncodeInBinary(msg)
+func (msg *MessageInv) ToBytes() ([]byte, error) {
+	return utils.EncodeInGob(msg)
 }
 
 func (rpc *RPC) VisitAsMessageInv() (*MessageInv, error) {
-	return utils.DecodeInBinary[MessageInv](rpc.Payload)
+	return utils.DecodeInGob[MessageInv](rpc.Payload)
 }
 func (msg *Message) VisitAsMessageInv() (*MessageInv, error) {
-	return utils.DecodeInBinary[MessageInv](msg.Payload)
+	return utils.DecodeInGob[MessageInv](msg.Payload)
 }
 
 // Requesting data is the same as announcing you have that data
@@ -186,15 +186,15 @@ type MessageBlock struct {
 	Block core.Block
 }
 
-func (msg *MessageBlock) ToBytes() []byte {
-	return utils.EncodeInBinary(msg)
+func (msg *MessageBlock) ToBytes() ([]byte, error) {
+	return utils.EncodeInGob(msg)
 }
 
 func (rpc *RPC) VisitAsMessageBlock() (*MessageBlock, error) {
-	return utils.DecodeInBinary[MessageBlock](rpc.Payload)
+	return utils.DecodeInGob[MessageBlock](rpc.Payload)
 }
 func (msg *Message) VisitAsMessageBlock() (*MessageBlock, error) {
-	return utils.DecodeInBinary[MessageBlock](msg.Payload)
+	return utils.DecodeInGob[MessageBlock](msg.Payload)
 }
 
 // Errors for the message module

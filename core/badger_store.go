@@ -51,6 +51,19 @@ func NewBadgerStore(path string) (*BadgerStore, error) {
 	}, nil
 }
 
+func (b *BadgerStore) Exists(hash BlockHash) bool {
+	exists := true
+	_ = b.DB.View(func(txn *badger.Txn) error {
+		key := blockPrefix.ConstructKey(hash)
+		_, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			exists = false
+		}
+		return nil
+	})
+	return exists
+}
+
 func (b *BadgerStore) GetBlock(hash BlockHash) (*Block, error) {
 	var value []byte
 	err := b.DB.View(func(txn *badger.Txn) error {

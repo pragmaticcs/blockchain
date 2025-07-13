@@ -3,6 +3,7 @@ package p2p
 type RpcCommand uint16
 
 const (
+
 	// For peer discovery and connections
 	RpcCommandVersion RpcCommand = iota
 	RpcCommandAddr               // Msg containing addresses of peers
@@ -16,6 +17,9 @@ const (
 
 	// For real-time data sharing (Gossip protocol)
 	RpcCommandTx // Message containing a single transaction
+
+	// For errors
+	RpcCommandNotFound
 )
 
 type RPC struct {

@@ -64,7 +64,7 @@ func (t *TCPTransport) Consume() <-chan RPC { // read-only channel of messages
 	return t.RpcCh
 }
 
-func (t *TCPTransport) Start() error {
+func (t *TCPTransport) ListenAndServe() error {
 	var err error
 	t.Listener, err = net.Listen("tcp", t.ListenAddr)
 	if err != nil {
@@ -74,7 +74,6 @@ func (t *TCPTransport) Start() error {
 	log.Printf("TCP transport listening on port: %s", t.ListenAddr)
 
 	t.Bootstrap()
-
 	return nil
 }
 
@@ -166,6 +165,13 @@ func (t *TCPTransport) Broadcast(payload []byte, command RpcCommand) {
 			log.Printf("broadcast error: %v for addr [%s]", err, addr)
 		}
 	}
+}
+
+func (t *TCPTransport) GetPeer(addr string) (*TCPPeer, bool) {
+	t.PeerLock.Lock()
+	defer t.PeerLock.Unlock()
+	peer, ok := t.Peers[addr]
+	return peer, ok
 }
 
 func (t *TCPTransport) AddPeer(peer *TCPPeer) {

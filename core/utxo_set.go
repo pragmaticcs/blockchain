@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"encoding/binary"
-	"sync"
 )
 
 type OutPoint struct {
@@ -45,24 +44,13 @@ type UTXOs map[OutPoint]TxOutput
 type UTXOset struct {
 	Blockchain *Blockchain
 	Store      Store
-
-	lock sync.RWMutex
 }
 
 func NewUTXOset(b *Blockchain, s Store) *UTXOset {
 	return &UTXOset{
 		Blockchain: b,
 		Store:      s,
-		lock:       sync.RWMutex{},
 	}
-}
-
-func (u *UTXOset) Lock() {
-	u.lock.Lock()
-}
-
-func (u *UTXOset) Unlock() {
-	u.lock.Unlock()
 }
 
 func (u *UTXOset) Reindex() error {
