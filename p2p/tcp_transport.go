@@ -56,6 +56,14 @@ func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	}
 }
 
+func (t *TCPTransport) GetAddr() string {
+	if t.Listener == nil {
+		return ""
+	} else {
+		return t.Listener.Addr().String()
+	}
+}
+
 func (t *TCPTransport) Close() error {
 	return t.Listener.Close()
 }
@@ -71,7 +79,7 @@ func (t *TCPTransport) ListenAndServe() error {
 		return err
 	}
 	go t.StartAcceptLoop()
-	log.Printf("TCP transport listening on port: %s", t.ListenAddr)
+	log.Printf("TCP transport listening on port: %s", t.Listener.Addr().String())
 
 	t.Bootstrap()
 	return nil
@@ -103,20 +111,14 @@ func (t *TCPTransport) Bootstrap() {
 		return
 	}
 	for _, addr := range t.SeedPeers {
-		conn, err := t.Connect(addr)
-		if err != nil {
-			// TODO: Handle periodic reconnection
-			log.Printf("Couldn't connect to peer at addr [%s]", addr)
-			continue
-		}
-		go t.HandleConn(conn)
+		t.HandleNewPeer(addr)
 	}
 }
 
 func (t *TCPTransport) HandleConn(conn net.Conn) {
 	peer := NewTCPPeer(conn)
 
-	log.Println("Trying to handshake")
+	log.Println("trying to handshake")
 	err := t.Handshake(peer)
 	if err != nil {
 		log.Printf("handshake with %s failed: %v", peer.GetAddr(), err)
@@ -167,17 +169,40 @@ func (t *TCPTransport) Broadcast(payload []byte, command RpcCommand) {
 	}
 }
 
-func (t *TCPTransport) GetPeer(addr string) (*TCPPeer, bool) {
-	t.PeerLock.Lock()
-	defer t.PeerLock.Unlock()
+func (t *TCPTransport) HandleNewPeer(addr string) bool {
+	_, ok := t.GetPeer(addr)
+	if ok {
+		return false
+	}
+
+	conn, err := t.Connect(addr)
+	if err != nil {
+		log.Printf("couldn't connect to peer at addr [%s]", addr)
+		return false
+	}
+	go t.HandleConn(conn)
+	return true
+}
+
+func (t *TCPTransport) getPeerUnlocked(addr string) (*TCPPeer, bool) {
 	peer, ok := t.Peers[addr]
 	return peer, ok
+}
+
+func (t *TCPTransport) GetPeer(addr string) (*TCPPeer, bool) {
+	t.PeerLock.RLock()
+	defer t.PeerLock.RUnlock()
+	return t.getPeerUnlocked(addr)
+}
+
+func (t *TCPTransport) addPeerUnlocked(peer *TCPPeer) {
+	t.Peers[peer.GetAddr()] = peer
 }
 
 func (t *TCPTransport) AddPeer(peer *TCPPeer) {
 	t.PeerLock.Lock()
 	defer t.PeerLock.Unlock()
-	t.Peers[peer.GetAddr()] = peer
+	t.addPeerUnlocked(peer)
 }
 
 func (t *TCPTransport) RemovePeer(peer *TCPPeer) {

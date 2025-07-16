@@ -187,6 +187,7 @@ func (msg *MessageBlock) ToBytes() ([]byte, error) {
 func (rpc *RPC) VisitAsMessageBlock() (*MessageBlock, error) {
 	return utils.DecodeInGob[MessageBlock](rpc.Payload)
 }
+
 func (msg *Message) VisitAsMessageBlock() (*MessageBlock, error) {
 	return utils.DecodeInGob[MessageBlock](msg.Payload)
 }

@@ -44,8 +44,8 @@ func main() {
 
 	thirdNodeOpts := node.NodeOpts{
 		Port:                  "localhost:5555",
-		SeedNodes:             []string{"localhost:3000", "localhost:3333"},
-		WalletName:            "alice",
+		SeedNodes:             []string{"localhost:3333"},
+		WalletName:            "bob",
 		WalletDir:             dir,
 		BlockchainDatabaseDir: dir,
 		GenesisConfigDir:      dir,
@@ -75,13 +75,13 @@ func main() {
 		handle(err)
 	}()
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	go func() {
 		err := secondNode.Start()
 		handle(err)
 	}()
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	go func() {
 		err := thirdNode.Start()
 		handle(err)

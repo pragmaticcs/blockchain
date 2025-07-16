@@ -15,6 +15,12 @@ import (
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
+// Maximum number of goroutines handling different
+// job in the mainloop of the node
+const MaxWorkers int = 8
+
+type PeriodicTask func() error
+
 type NodeOpts struct {
 	Port                  string
 	SeedNodes             []string
@@ -50,6 +56,7 @@ type Node struct {
 	rpcCh  chan p2p.RPC
 	quitCh chan struct{}
 	syncCh chan struct{}
+	ticker *time.Ticker
 }
 
 func NewNode(opts NodeOpts) (*Node, error) {
@@ -77,6 +84,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		rpcCh:            make(chan p2p.RPC, 100),
 		quitCh:           make(chan struct{}),
 		syncCh:           make(chan struct{}),
+		ticker:           time.NewTicker(5 * time.Second),
 	}
 	transportOpts := p2p.TCPTransportOpts{
 		ListenAddr: opts.Port,
@@ -105,7 +113,7 @@ func (n *Node) rpcWorker() {
 }
 
 func (n *Node) Start() error {
-	n.launchWorkerPool(8)
+	n.launchWorkerPool(MaxWorkers)
 	go n.MainLoop()
 	err := n.Transport.ListenAndServe()
 	if err != nil {
@@ -141,6 +149,8 @@ func (n *Node) MainLoop() {
 			n.rpcCh <- rpc
 		case <-n.syncCh:
 			go n.SyncManager.attemptSync()
+		case <-n.ticker.C:
+			go n.HandlePeriodicTasks()
 		case <-n.quitCh:
 			log.Println("MainLoop: received quit signal, shutting down.")
 			return
@@ -155,7 +165,9 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 	case p2p.RpcCommandBlock:
 		return n.HandleRpcBlock(rpc)
 	case p2p.RpcCommandAddr:
+		return n.HandleRpcAddr(rpc)
 	case p2p.RpcCommandGetAddr:
+		return n.HandleRpcGetAddr(rpc)
 	case p2p.RpcCommandTx:
 	case p2p.RpcCommandGetBlocks:
 		return n.HandleRpcGetBlocks(rpc)
@@ -219,6 +231,7 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 	}
 
 	n.PeerManager.FinishHandshake(peer, theirMsgVersion.LatestBlockHeight)
+	n.RequestAddr(peer)
 
 	if theirMsgVersion.LatestBlockHeight > n.StateManager.GetLatestBlockHeight() {
 		n.sendSyncSignal()
@@ -228,37 +241,47 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 }
 
 func (n *Node) HandlePeriodicTasks() error {
+	peers := n.PeerManager.GetBroadcastCandidates()
+	log.Printf("connected to %d peers", len(peers))
 	return nil
 }
 
-func (n *Node) addInFlightRequests(items []p2p.InvVector) {
-	n.inFlightLock.Lock()
-	defer n.inFlightLock.Unlock()
-	for _, item := range items {
-		key := hex.EncodeToString(item.Hash)
-		n.inFlightRequests[key] = time.Now()
+func (n *Node) RequestAddr(peer p2p.Peer) error {
+	msg := p2p.NewMessage(nil, p2p.RpcCommandGetAddr)
+	return n.PeerManager.SendMessage(peer.GetAddr(), msg)
+}
+
+func (n *Node) HandleRpcNotFound(rpc p2p.RPC) error {
+	// TODO: Handle Not Found response here and in sync manager
+	return nil
+}
+
+func (n *Node) HandleRpcGetAddr(rpc p2p.RPC) error {
+	peers := n.PeerManager.GetBroadcastCandidates()
+	var peerAddrs []string
+	for _, peer := range peers {
+		if peer.GetAddr() != rpc.From {
+			peerAddrs = append(peerAddrs, peer.GetAddr())
+		}
 	}
+	msgAddr := p2p.MessageAddr{
+		AddrList: peerAddrs,
+	}
+	payload, _ := msgAddr.ToBytes()
+	msg := p2p.NewMessage(payload, p2p.RpcCommandAddr)
+	return n.PeerManager.SendMessage(rpc.From, msg)
 }
 
-func (n *Node) isInFlightRequest(hash []byte) bool {
-	n.inFlightLock.RLock()
-	defer n.inFlightLock.RUnlock()
-	key := hex.EncodeToString(hash)
-	_, ok := n.inFlightRequests[key]
-	return ok
-}
-
-func (n *Node) removeInFlightRequest(hash []byte) {
-	n.inFlightLock.Lock()
-	defer n.inFlightLock.Unlock()
-	key := hex.EncodeToString(hash)
-	delete(n.inFlightRequests, key)
-}
-
-func (n *Node) noInFlightRequests() bool {
-	n.inFlightLock.RLock()
-	defer n.inFlightLock.RUnlock()
-	return len(n.inFlightRequests) == 0
+func (n *Node) HandleRpcAddr(rpc p2p.RPC) error {
+	msgAddr, err := rpc.VisitAsMessageAddr()
+	if err != nil {
+		return NewNodeError("couldn't decode message addr")
+	}
+	for _, addr := range msgAddr.AddrList {
+		log.Printf("got new peer addr %s", addr)
+		n.Transport.HandleNewPeer(addr)
+	}
+	return nil
 }
 
 func (n *Node) HandleRpcInv(rpc p2p.RPC) error {
@@ -268,13 +291,12 @@ func (n *Node) HandleRpcInv(rpc p2p.RPC) error {
 	}
 	msgInv, err := rpc.VisitAsMessageInv()
 	if err != nil {
-		return NewNodeError("sync error: couldn't decode message inv")
+		return NewNodeError("couldn't decode message inv")
 	}
 	filteredItems := n.filterExistingItems(msgInv.Items)
 	if len(filteredItems) == 0 {
 		return nil
 	}
-	n.addInFlightRequests(filteredItems)
 	msgGetData := p2p.MessageGetData{
 		Items: filteredItems,
 	}
@@ -401,6 +423,36 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 
 func (n *Node) Validate(block *core.Block) bool {
 	return true
+}
+
+func (n *Node) addInFlightRequests(items []p2p.InvVector) {
+	n.inFlightLock.Lock()
+	defer n.inFlightLock.Unlock()
+	for _, item := range items {
+		key := hex.EncodeToString(item.Hash)
+		n.inFlightRequests[key] = time.Now()
+	}
+}
+
+func (n *Node) isInFlightRequest(hash []byte) bool {
+	n.inFlightLock.RLock()
+	defer n.inFlightLock.RUnlock()
+	key := hex.EncodeToString(hash)
+	_, ok := n.inFlightRequests[key]
+	return ok
+}
+
+func (n *Node) removeInFlightRequest(hash []byte) {
+	n.inFlightLock.Lock()
+	defer n.inFlightLock.Unlock()
+	key := hex.EncodeToString(hash)
+	delete(n.inFlightRequests, key)
+}
+
+func (n *Node) noInFlightRequests() bool {
+	n.inFlightLock.RLock()
+	defer n.inFlightLock.RUnlock()
+	return len(n.inFlightRequests) == 0
 }
 
 type HandshakeError struct {

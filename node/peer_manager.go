@@ -115,7 +115,7 @@ func (p *PeerManager) GetSyncCandidates(ownHeight uint32) []p2p.Peer {
 	return candidatePeers
 }
 
-func (p *PeerManager) GetBroadcaseCandidates() []p2p.Peer {
+func (p *PeerManager) GetBroadcastCandidates() []p2p.Peer {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
