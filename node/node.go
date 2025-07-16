@@ -15,13 +15,6 @@ import (
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
-type NodeState uint8
-
-const (
-	NodeStateIdle NodeState = iota
-	NodeStateSync
-)
-
 type NodeOpts struct {
 	Port                  string
 	SeedNodes             []string
@@ -45,22 +38,21 @@ func DefaultNodeOpts() NodeOpts {
 
 type Node struct {
 	StateManager *core.StateManager
-	Mempool      *core.Mempool
+	Mempool      *Mempool
 	Transport    *p2p.TCPTransport // TODO: Replace with Transport interface
+	SyncManager  *SyncManager
+	PeerManager  *PeerManager
 
 	// Keep track of current requests
-	state            NodeState
-	stateLock        sync.Mutex
-	syncPeer         p2p.Peer
 	inFlightRequests map[string]time.Time
 	inFlightLock     sync.RWMutex
 	// Channels
-	quitCh        chan struct{}
-	syncRequestCh chan SyncRequest // Maybe replace with RPC to self?
+	rpcCh  chan p2p.RPC
+	quitCh chan struct{}
+	syncCh chan struct{}
 }
 
 func NewNode(opts NodeOpts) (*Node, error) {
-
 	store, err := core.NewBadgerStore(opts.BlockchainDatabaseDir)
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't connect to the database: %s", err))
@@ -79,13 +71,12 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		StateManager:     stateManager,
 		Mempool:          nil,
 		Transport:        nil,
-		state:            NodeStateIdle,
-		stateLock:        sync.Mutex{},
-		syncPeer:         nil,
+		PeerManager:      NewPeerManager(),
 		inFlightRequests: make(map[string]time.Time),
 		inFlightLock:     sync.RWMutex{},
+		rpcCh:            make(chan p2p.RPC, 100),
 		quitCh:           make(chan struct{}),
-		syncRequestCh:    make(chan SyncRequest),
+		syncCh:           make(chan struct{}),
 	}
 	transportOpts := p2p.TCPTransportOpts{
 		ListenAddr: opts.Port,
@@ -93,10 +84,28 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		Handshake:  node.Handshake,
 	}
 	node.Transport = p2p.NewTCPTransport(transportOpts)
+	node.SyncManager = NewSyncManager(node.PeerManager, node)
 	return node, err
 }
 
+func (n *Node) launchWorkerPool(jobs int) {
+	for range jobs {
+		go n.rpcWorker()
+	}
+}
+
+func (n *Node) rpcWorker() {
+	// RPC worker listens on the channels of rpcs
+	for rpc := range n.rpcCh {
+		err := n.HandleRpc(rpc)
+		if err != nil {
+			log.Printf("error handling RPC from %s: %v", rpc.From, err)
+		}
+	}
+}
+
 func (n *Node) Start() error {
+	n.launchWorkerPool(8)
 	go n.MainLoop()
 	err := n.Transport.ListenAndServe()
 	if err != nil {
@@ -108,6 +117,8 @@ func (n *Node) Start() error {
 func (n *Node) Stop() {
 	// Handles graceful shutdown
 	n.sendQuitSignal()
+	close(n.quitCh)
+	close(n.rpcCh)
 	_ = n.Transport.Close()
 	_ = n.StateManager.Close()
 }
@@ -117,29 +128,21 @@ func (n *Node) sendQuitSignal() {
 	n.quitCh <- struct{}{}
 }
 
-func (n *Node) sendSyncRequest(peer p2p.Peer, blockheight uint32) {
-	time.Sleep(time.Second)
-	n.syncRequestCh <- SyncRequest{
-		Peer:           peer,
-		NewBlockHeight: blockheight,
-	}
+func (n *Node) sendSyncSignal() {
+	// Sends a sync signal
+	n.syncCh <- struct{}{}
 }
 
 func (n *Node) MainLoop() {
 	for {
 		select {
 		case rpc := <-n.Transport.RpcCh:
-			go func(rpc p2p.RPC) {
-				err := n.HandleRpc(rpc)
-				if err != nil {
-					log.Println(err)
-				}
-			}(rpc)
-		case req := <-n.syncRequestCh:
-			if n.state == NodeStateIdle {
-				n.StartSync(req.Peer)
-			}
+			// Redirect rpc to workerpool
+			n.rpcCh <- rpc
+		case <-n.syncCh:
+			go n.SyncManager.attemptSync()
 		case <-n.quitCh:
+			log.Println("MainLoop: received quit signal, shutting down.")
 			return
 		}
 	}
@@ -158,6 +161,9 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 		return n.HandleRpcGetBlocks(rpc)
 	case p2p.RpcCommandGetData:
 		return n.HandleRpcGetData(rpc)
+	case p2p.RpcCommandNotFound:
+		log.Println("NOT FOUND")
+		return nil
 	default:
 		return nil
 	}
@@ -165,6 +171,7 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 }
 
 func (n *Node) Handshake(peer p2p.Peer) error {
+	n.PeerManager.AddPeer(peer)
 	// Send a version message
 	ourMsgVersion := p2p.MessageVersion{
 		ProtocolVersion:   core.CurrentVersion,
@@ -211,53 +218,17 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 		return NewHandshakeError("peer handshake response command is not verack")
 	}
 
+	n.PeerManager.FinishHandshake(peer, theirMsgVersion.LatestBlockHeight)
+
 	if theirMsgVersion.LatestBlockHeight > n.StateManager.GetLatestBlockHeight() {
-		n.sendSyncRequest(peer, theirMsgVersion.LatestBlockHeight)
+		n.sendSyncSignal()
 	}
 
 	return nil
-}
-
-func (n *Node) StartSync(peer p2p.Peer) error {
-	n.setStateSync(peer)
-	log.Println("attempting syncing with peer")
-
-	// Request blocks our blockchain head
-	msgGetBlocks := p2p.MessageGetBlocks{
-		From: n.StateManager.Blockchain.Head,
-	}
-	msgPayload, err := msgGetBlocks.ToBytes()
-	if err != nil {
-		return err
-	}
-	msg := p2p.NewMessage(msgPayload, p2p.RpcCommandGetBlocks)
-
-	return n.SendMessage(peer.GetAddr(), msg)
-}
-
-func (n *Node) setStateIdle() {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-	n.state = NodeStateIdle
-	n.syncPeer = nil
-}
-
-func (n *Node) setStateSync(peer p2p.Peer) {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-	n.state = NodeStateSync
-	n.syncPeer = peer
 }
 
 func (n *Node) HandlePeriodicTasks() error {
 	return nil
-}
-
-func (n *Node) tryFinishSync() {
-	if n.noInFlightRequests() {
-		log.Println("finished syncing")
-		n.setStateIdle()
-	}
 }
 
 func (n *Node) addInFlightRequests(items []p2p.InvVector) {
@@ -290,7 +261,11 @@ func (n *Node) noInFlightRequests() bool {
 	return len(n.inFlightRequests) == 0
 }
 
-func (n *Node) HandleRpcInvIdle(rpc p2p.RPC) error {
+func (n *Node) HandleRpcInv(rpc p2p.RPC) error {
+	if n.SyncManager.IsSyncing() {
+		// Delegate the task to Sync Manager if syncing
+		return n.SyncManager.HandleRpcInv(rpc)
+	}
 	msgInv, err := rpc.VisitAsMessageInv()
 	if err != nil {
 		return NewNodeError("sync error: couldn't decode message inv")
@@ -309,14 +284,7 @@ func (n *Node) HandleRpcInvIdle(rpc p2p.RPC) error {
 		return err
 	}
 	msg := p2p.NewMessage(payload, p2p.RpcCommandGetData)
-	return n.SendMessage(rpc.From, msg)
-}
-
-func (n *Node) HandleRpcInvSync(rpc p2p.RPC) error {
-	if rpc.From != n.syncPeer.GetAddr() {
-		return nil
-	}
-	return n.HandleRpcInvIdle(rpc)
+	return n.PeerManager.SendMessage(rpc.From, msg)
 }
 
 func (n *Node) filterExistingItems(items []p2p.InvVector) []p2p.InvVector {
@@ -335,16 +303,6 @@ func (n *Node) itemExists(item p2p.InvVector) bool {
 	return false
 }
 
-func (n *Node) HandleRpcInv(rpc p2p.RPC) error {
-	switch n.state {
-	case NodeStateIdle:
-		return n.HandleRpcInvIdle(rpc)
-	case NodeStateSync:
-		return n.HandleRpcInvSync(rpc)
-	}
-	return nil
-}
-
 func (n *Node) HandleRpcGetData(rpc p2p.RPC) error {
 	msgGetData, err := rpc.VisitAsMessageInv()
 	if err != nil {
@@ -353,7 +311,10 @@ func (n *Node) HandleRpcGetData(rpc p2p.RPC) error {
 	for _, item := range msgGetData.Items {
 		switch item.Type {
 		case p2p.InvTypeBlock:
-			return n.HandleGetDataBlock(item, rpc.From)
+			err := n.HandleGetDataBlock(item, rpc.From)
+			if err != nil {
+				return err
+			}
 		case p2p.InvTypeTx:
 			return nil
 		}
@@ -364,10 +325,9 @@ func (n *Node) HandleRpcGetData(rpc p2p.RPC) error {
 func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
 	if !n.StateManager.BlockExists(item.Hash) {
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
-		return n.SendMessage(addr, messageNotFound)
+		return n.PeerManager.SendMessage(addr, messageNotFound)
 	}
 
-	// TODO: add a method to the state manager for handling fetching blocks
 	block, err := n.StateManager.GetBlock(item.Hash)
 	if err != nil {
 		return err
@@ -380,22 +340,20 @@ func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
 		return err
 	}
 	msg := p2p.NewMessage(payload, p2p.RpcCommandBlock)
-	return n.SendMessage(addr, msg)
+	return n.PeerManager.SendMessage(addr, msg)
 }
 
 func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
-	if n.state == NodeStateSync && rpc.From != n.syncPeer.GetAddr() {
-		return nil
+	if n.SyncManager.IsSyncing() {
+		// Delegate the task to Sync Manager
+		return n.SyncManager.HandleRpcBlock(rpc)
 	}
-
 	msgBlock, err := rpc.VisitAsMessageBlock()
 	if err != nil {
 		return err
 	}
 	block := &msgBlock.Block
-	if n.state == NodeStateSync && !n.isInFlightRequest(block.GetHash()) {
-		return nil
-	}
+
 	valid := n.Validate(block)
 	if !valid {
 		return NewNodeError(fmt.Sprintf("block received from %s is not valid", rpc.From))
@@ -404,20 +362,7 @@ func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
 	if err != nil {
 		return err
 	}
-	if n.state == NodeStateSync {
-		n.removeInFlightRequest(block.GetHash())
-		n.tryFinishSync()
-	}
 	return nil
-}
-
-func (n *Node) SendMessage(addr string, msg *p2p.Message) error {
-	peer, ok := n.Transport.GetPeer(addr)
-	if !ok {
-		return NewNodeError("peer doesn't exist")
-	}
-	encoder := p2p.NewMessageEncoder(peer)
-	return encoder.Encode(msg)
 }
 
 func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
@@ -427,7 +372,7 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 	}
 	if !n.StateManager.Blockchain.Store.Exists(msgGetBlocks.From) {
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
-		return n.SendMessage(rpc.From, messageNotFound)
+		return n.PeerManager.SendMessage(rpc.From, messageNotFound)
 	}
 	var items []p2p.InvVector
 	for block := range n.StateManager.Blockchain.Iterate() {
@@ -440,6 +385,9 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 			Hash: blockHash,
 		})
 	}
+	// Currently in our Blocks First implementation of syncing
+	// we have to return hashes in order :(
+	slices.Reverse(items)
 	messageInv := p2p.MessageInv{
 		Items: items,
 	}
@@ -448,12 +396,7 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 		return err
 	}
 	msg := p2p.NewMessage(payload, p2p.RpcCommandInv)
-	return n.SendMessage(rpc.From, msg)
-}
-
-type SyncRequest struct {
-	Peer           p2p.Peer
-	NewBlockHeight uint32
+	return n.PeerManager.SendMessage(rpc.From, msg)
 }
 
 func (n *Node) Validate(block *core.Block) bool {

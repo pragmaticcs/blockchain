@@ -42,27 +42,48 @@ func main() {
 		GenesisConfigDir:      dir,
 	}
 
+	thirdNodeOpts := node.NodeOpts{
+		Port:                  "localhost:5555",
+		SeedNodes:             []string{"localhost:3000", "localhost:3333"},
+		WalletName:            "alice",
+		WalletDir:             dir,
+		BlockchainDatabaseDir: dir,
+		GenesisConfigDir:      dir,
+	}
+
 	firstNode, err := node.NewNode(firstNodeOpts)
 	handle(err)
 
 	// Now the first blockchain is longer then the second
-	err = firstNode.StateManager.Send(aliceAddr, 10)
-	handle(err)
+	for range 10 {
+		err = firstNode.StateManager.Send(aliceAddr, 1)
+		handle(err)
+	}
 
 	secondNode, err := node.NewNode(secondNodeOpts)
 	handle(err)
 
+	thirdNode, err := node.NewNode(thirdNodeOpts)
+	handle(err)
+
 	defer firstNode.Stop()
 	defer secondNode.Stop()
+	defer thirdNode.Stop()
 
 	go func() {
 		err := firstNode.Start()
 		handle(err)
 	}()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	go func() {
 		err := secondNode.Start()
+		handle(err)
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+	go func() {
+		err := thirdNode.Start()
 		handle(err)
 	}()
 

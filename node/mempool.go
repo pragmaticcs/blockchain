@@ -1,4 +1,4 @@
-package core
+package node
 
 type Mempool struct {
 }

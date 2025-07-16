@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 
@@ -157,11 +156,6 @@ const (
 type InvVector struct {
 	Type InvType
 	Hash []byte
-}
-
-func (i *InvVector) ToMapKey() string {
-	data := append([]byte{byte(i.Type)}, i.Hash...)
-	return hex.EncodeToString(data)
 }
 
 type MessageInv struct {
