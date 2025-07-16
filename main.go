@@ -56,7 +56,7 @@ func main() {
 
 	// Now the first blockchain is longer then the second
 	for range 10 {
-		err = firstNode.StateManager.Send(aliceAddr, 1)
+		err = firstNode.StateManager.Send(aliceAddr, 1, 0)
 		handle(err)
 	}
 

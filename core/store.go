@@ -16,6 +16,7 @@ type Store interface {
 
 	PutUTXOs(UTXOs) error
 	DeleteUTXOs([]OutPoint) error
+	GetUTXO(OutPoint) (*TxOutput, error)
 	// Combined operation for atomicity
 	PutDeleteUTXOs(put UTXOs, delete []OutPoint) error
 

@@ -167,6 +167,29 @@ func (b *BadgerStore) DeleteUTXOs(outPoints []OutPoint) error {
 	})
 }
 
+func (b *BadgerStore) GetUTXO(outpoint OutPoint) (*TxOutput, error) {
+	var value []byte
+	err := b.DB.View(func(txn *badger.Txn) error {
+		outPointData, err := EncodeOutpoint(&outpoint)
+		if err != nil {
+			return err
+		}
+		item, err := txn.Get(outPointData)
+		if err != nil {
+			return err
+		}
+		value, err = item.ValueCopy(value)
+		return err
+	})
+	if err == badger.ErrKeyNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return b.UtxoEncoderDecoder.Decode(value)
+}
+
 func (b *BadgerStore) PutDeleteUTXOs(put UTXOs, delete []OutPoint) error {
 	// This method combines adding and deleting values
 	// in one atomic transaction

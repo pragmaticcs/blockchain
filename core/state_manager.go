@@ -59,7 +59,7 @@ func (s *StateManager) GetBalance() (int, error) {
 	return s.UtxoSet.FindSpendableAmount(pubKeyHash)
 }
 
-func (s *StateManager) NewTransaction(to wallet.Address, amount int) (*Transaction, error) {
+func (s *StateManager) NewTransaction(to wallet.Address, amount int, fee int) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -71,7 +71,7 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount int) (*Transacti
 	if err != nil {
 		return nil, err
 	}
-	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, amount)
+	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, amount+fee)
 	if sum < int64(amount) {
 		return nil, wallet.ErrorInsufficientBalance
 	}
@@ -146,10 +146,10 @@ func (s *StateManager) Update(block *Block) error {
 	return s.updateUnlocked(block)
 }
 
-func (s *StateManager) Send(to wallet.Address, amount int) error {
+func (s *StateManager) Send(to wallet.Address, amount int, fee int) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	tx, err := s.NewTransaction(to, amount)
+	tx, err := s.NewTransaction(to, amount, fee)
 	if err != nil {
 		return err
 	}
@@ -159,4 +159,28 @@ func (s *StateManager) Send(to wallet.Address, amount int) error {
 		return err
 	}
 	return s.updateUnlocked(block)
+}
+
+func (s *StateManager) CalculateFee(tx *Transaction) (int, error) {
+	inputs := 0
+	for _, in := range tx.Inputs {
+		outPoint := NewOutPoint(in.TxID, in.OutID)
+		out, err := s.UtxoSet.Store.GetUTXO(outPoint)
+		if err != nil {
+			return -1, err
+		}
+		if out == nil {
+			return -1, fmt.Errorf("output is either spent or doesn't exist")
+		}
+		inputs += int(out.Value)
+	}
+
+	outputs := 0
+	for _, out := range tx.Outputs {
+		outputs += int(out.Value)
+	}
+	if inputs < outputs {
+		return -1, fmt.Errorf("sum of inputs can't be less than sum of outputs")
+	}
+	return inputs - outputs, nil
 }

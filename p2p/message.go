@@ -192,6 +192,22 @@ func (msg *Message) VisitAsMessageBlock() (*MessageBlock, error) {
 	return utils.DecodeInGob[MessageBlock](msg.Payload)
 }
 
+type MessageTx struct {
+	Tx core.Transaction
+}
+
+func (msg *MessageTx) ToBytes() ([]byte, error) {
+	return utils.EncodeInGob(msg)
+}
+
+func (rpc *RPC) VisitAsMessageTx() (*MessageTx, error) {
+	return utils.DecodeInGob[MessageTx](rpc.Payload)
+}
+
+func (msg *Message) VisitAsMessageTx() (*MessageTx, error) {
+	return utils.DecodeInGob[MessageTx](msg.Payload)
+}
+
 // Errors for the message module
 type MessageError struct {
 	Err string
