@@ -13,6 +13,10 @@ import (
 	"github.com/pragmaticcs/blockchain/crypto"
 )
 
+var (
+	ErrorInsufficientBalance = NewWalletError("insufficient account balance")
+)
+
 type Address string
 
 const (
@@ -30,19 +34,6 @@ type JsonWallet struct {
 	PrivateKey    string `json:"private_key"`
 	PublicKey     string `json:"public_key"`
 	AddressLength int    `json:"address_length"`
-}
-
-func (w *Wallets) AddWallet() (Address, error) {
-	newWallet, err := NewWallet()
-	if err != nil {
-		return "", err
-	}
-	address, err := newWallet.GetAddress()
-	if err != nil {
-		return "", err
-	}
-	w.Wallets[address] = newWallet
-	return address, nil
 }
 
 func NewWallet() (*Wallet, error) {

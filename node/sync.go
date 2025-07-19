@@ -2,11 +2,11 @@ package node
 
 import (
 	"encoding/hex"
-	"fmt"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/pragmaticcs/blockchain/core"
 	"github.com/pragmaticcs/blockchain/p2p"
 )
 
@@ -25,9 +25,13 @@ type SyncManager struct {
 
 	pendingJobs      chan *DownloadJob
 	inFlightRequests map[string]*DownloadJob
-	syncing          bool
-	invPeer          p2p.Peer
+	// This map is to ensure processing blocks in correct order
+	pendingBlocks map[uint32]*core.Block // key is the blockheight
+
+	syncing          bool     // State to check if we are syncing
+	invPeer          p2p.Peer // Peer that we got our block hashes from
 	lock             sync.RWMutex
+	pendingBlockLock sync.RWMutex
 }
 
 func NewSyncManager(pm *PeerManager, n *Node) *SyncManager {
@@ -37,9 +41,11 @@ func NewSyncManager(pm *PeerManager, n *Node) *SyncManager {
 
 		pendingJobs:      make(chan *DownloadJob),
 		inFlightRequests: make(map[string]*DownloadJob),
+		pendingBlocks:    make(map[uint32]*core.Block),
 		syncing:          false,
 		invPeer:          nil,
 		lock:             sync.RWMutex{},
+		pendingBlockLock: sync.RWMutex{},
 	}
 }
 
@@ -83,7 +89,7 @@ func (s *SyncManager) assignJobLoop(ownHeight uint32) error {
 			break
 		}
 
-		err := s.AssignJobToPeer(job, assignedPeer)
+		err := s.assignJobToPeer(job, assignedPeer)
 		if err != nil {
 			return err
 		}
@@ -91,7 +97,7 @@ func (s *SyncManager) assignJobLoop(ownHeight uint32) error {
 	return nil
 }
 
-func (s *SyncManager) AssignJobToPeer(job *DownloadJob, peer p2p.Peer) error {
+func (s *SyncManager) assignJobToPeer(job *DownloadJob, peer p2p.Peer) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -162,24 +168,41 @@ func (s *SyncManager) HandleRpcBlock(rpc p2p.RPC) error {
 	}
 
 	block := msgBlock.Block
-	valid := s.Node.Validate(&block)
-	if !valid {
-		return NewNodeError(fmt.Sprintf("block received from %s is not valid", rpc.From))
-	}
-	err = s.Node.StateManager.Update(&block)
+	err = s.addPendingBlock(&block)
 	if err != nil {
 		return err
 	}
 
 	s.removeInFlightRequest(blockHash)
 
-	log.Printf("processed block %s", hex.EncodeToString(blockHash))
-
 	// If there are other requests -> return
 	if s.noInFlightRequests() {
 		s.finishSync()
 		log.Println("finished syncing")
 		// TODO: Check if other peers are ahead after syncing
+	}
+	return nil
+}
+
+func (s *SyncManager) addPendingBlock(block *core.Block) error {
+	s.pendingBlockLock.Lock()
+	defer s.pendingBlockLock.Unlock()
+
+	s.pendingBlocks[block.Height] = block
+	return s.processPendingBlocks()
+}
+
+func (s *SyncManager) processPendingBlocks() error {
+	for {
+		currHeight := s.Node.StateManager.GetLatestBlockHeight()
+		block, ok := s.pendingBlocks[currHeight+1]
+		if !ok {
+			break
+		}
+		err := s.Node.ProcessBlock(block)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -15,6 +15,10 @@ import (
 	"github.com/pragmaticcs/blockchain/wallet"
 )
 
+var (
+	ErrInvalidBlock = NewNodeError("block is not valid")
+)
+
 // Maximum number of goroutines handling different
 // job in the mainloop of the node
 const MaxWorkers int = 8
@@ -144,7 +148,7 @@ func (n *Node) sendSyncSignal() {
 func (n *Node) MainLoop() {
 	for {
 		select {
-		case rpc := <-n.Transport.RpcCh:
+		case rpc := <-n.Transport.Consume():
 			// Redirect rpc to workerpool
 			n.rpcCh <- rpc
 		case <-n.syncCh:
@@ -376,15 +380,19 @@ func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
 	}
 	block := &msgBlock.Block
 
-	valid := n.Validate(block)
-	if !valid {
-		return NewNodeError(fmt.Sprintf("block received from %s is not valid", rpc.From))
-	}
-	err = n.StateManager.Update(block)
+	return n.ProcessBlock(block)
+}
+
+func (n *Node) ProcessBlock(block *core.Block) error {
+	valid, err := n.StateManager.Validate(block)
 	if err != nil {
 		return err
 	}
-	return nil
+	if !valid {
+		return ErrInvalidBlock
+	}
+	log.Printf("processed block %s", hex.EncodeToString(block.GetHash()))
+	return n.StateManager.Update(block)
 }
 
 func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
@@ -407,8 +415,6 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 			Hash: blockHash,
 		})
 	}
-	// Currently in our Blocks First implementation of syncing
-	// we have to return hashes in order :(
 	slices.Reverse(items)
 	messageInv := p2p.MessageInv{
 		Items: items,
@@ -421,9 +427,14 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 	return n.PeerManager.SendMessage(rpc.From, msg)
 }
 
-func (n *Node) Validate(block *core.Block) bool {
-	return true
-}
+// func (n *Node) Mine(transactions []core.Transaction) error {
+// 	pow := core.NewPOW(core.DefaultDifficulty)
+// 	block, err := n.StateManager.Blockchain.NewBlock(transactions)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	_ = pow.Run(block)
+// }
 
 func (n *Node) addInFlightRequests(items []p2p.InvVector) {
 	n.inFlightLock.Lock()

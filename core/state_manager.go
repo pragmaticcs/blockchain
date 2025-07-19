@@ -143,7 +143,11 @@ func (s *StateManager) updateUnlocked(block *Block) error {
 func (s *StateManager) Update(block *Block) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	return s.updateUnlocked(block)
+	err := s.Blockchain.AddBlock(block)
+	if err != nil {
+		return err
+	}
+	return s.UtxoSet.Update(block)
 }
 
 func (s *StateManager) Send(to wallet.Address, amount int, fee int) error {
@@ -159,6 +163,24 @@ func (s *StateManager) Send(to wallet.Address, amount int, fee int) error {
 		return err
 	}
 	return s.updateUnlocked(block)
+}
+
+func (s *StateManager) Validate(block *Block) (bool, error) {
+	pow := NewPOW(block.Difficulty)
+	valid := pow.Validate(block)
+	if !valid {
+		return false, nil
+	}
+	for _, tx := range block.Transactions {
+		valid, err := s.Blockchain.VerifyTransaction(&tx)
+		if err != nil {
+			return false, err
+		}
+		if !valid {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (s *StateManager) CalculateFee(tx *Transaction) (int, error) {

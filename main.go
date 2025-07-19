@@ -44,7 +44,7 @@ func main() {
 
 	thirdNodeOpts := node.NodeOpts{
 		Port:                  "localhost:5555",
-		SeedNodes:             []string{"localhost:3333"},
+		SeedNodes:             []string{"localhost:3333", "localhost:3000"},
 		WalletName:            "bob",
 		WalletDir:             dir,
 		BlockchainDatabaseDir: dir,
@@ -55,7 +55,7 @@ func main() {
 	handle(err)
 
 	// Now the first blockchain is longer then the second
-	for range 10 {
+	for range 20 {
 		err = firstNode.StateManager.Send(aliceAddr, 1, 0)
 		handle(err)
 	}

@@ -184,25 +184,17 @@ func (t *TCPTransport) HandleNewPeer(addr string) bool {
 	return true
 }
 
-func (t *TCPTransport) getPeerUnlocked(addr string) (*TCPPeer, bool) {
-	peer, ok := t.Peers[addr]
-	return peer, ok
-}
-
 func (t *TCPTransport) GetPeer(addr string) (*TCPPeer, bool) {
 	t.PeerLock.RLock()
 	defer t.PeerLock.RUnlock()
-	return t.getPeerUnlocked(addr)
-}
-
-func (t *TCPTransport) addPeerUnlocked(peer *TCPPeer) {
-	t.Peers[peer.GetAddr()] = peer
+	peer, ok := t.Peers[addr]
+	return peer, ok
 }
 
 func (t *TCPTransport) AddPeer(peer *TCPPeer) {
 	t.PeerLock.Lock()
 	defer t.PeerLock.Unlock()
-	t.addPeerUnlocked(peer)
+	t.Peers[peer.GetAddr()] = peer
 }
 
 func (t *TCPTransport) RemovePeer(peer *TCPPeer) {

@@ -98,7 +98,8 @@ func (p *PeerManager) GetPeer(addr string) (*PeerState, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	return p.getPeerUnlocked(addr)
+	peerState, ok := p.peers[addr]
+	return peerState, ok
 }
 
 func (p *PeerManager) GetSyncCandidates(ownHeight uint32) []p2p.Peer {
