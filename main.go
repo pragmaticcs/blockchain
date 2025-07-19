@@ -16,8 +16,7 @@ func handle(err error) {
 }
 
 func main() {
-	dir, err := os.Getwd()
-	handle(err)
+	dir, _ := os.Getwd()
 
 	aliceWallet, err := wallet.LoadWalletFromFile(dir, "alice")
 	handle(err)
@@ -54,12 +53,6 @@ func main() {
 	firstNode, err := node.NewNode(firstNodeOpts)
 	handle(err)
 
-	// Now the first blockchain is longer then the second
-	for range 20 {
-		err = firstNode.StateManager.Send(aliceAddr, 1, 0)
-		handle(err)
-	}
-
 	secondNode, err := node.NewNode(secondNodeOpts)
 	handle(err)
 
@@ -75,13 +68,18 @@ func main() {
 		handle(err)
 	}()
 
-	time.Sleep(1000 * time.Millisecond)
+	for range 10 {
+		err = firstNode.StateManager.Send(aliceAddr, 1, 0)
+		handle(err)
+	}
+
+	time.Sleep(2 * time.Second)
+
 	go func() {
 		err := secondNode.Start()
 		handle(err)
 	}()
 
-	time.Sleep(1000 * time.Millisecond)
 	go func() {
 		err := thirdNode.Start()
 		handle(err)

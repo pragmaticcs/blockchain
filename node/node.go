@@ -77,7 +77,10 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't load wallet: %s", err))
 	}
-	stateManager := core.NewStateManager(blockchain, wallet)
+	stateManager, err := core.NewStateManager(blockchain, wallet)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the state manager: %s", err))
+	}
 	node := &Node{
 		StateManager:     stateManager,
 		Mempool:          nil,

@@ -11,15 +11,10 @@ import (
 
 func TestBadgerStore(t *testing.T) {
 	tempDir := t.TempDir()
-	wallets := &wallet.Wallets{
-		Wallets: map[wallet.Address]*wallet.Wallet{},
-		FileDir: "",
-	}
-	bob, err := wallets.AddWallet()
+	bob, err := wallet.NewWallet()
 	assert.NoError(t, err)
-	bobsWallet, err := wallets.GetWallet(bob)
-	assert.NoError(t, err)
-	pubKeyHash, err := crypto.HashPublicKey(bobsWallet.PublicKey)
+
+	pubKeyHash, err := crypto.HashPublicKey(bob.PublicKey)
 	assert.NoError(t, err)
 	genesisConf := GenesisConfig{Amount: 50, PubKeyHash: pubKeyHash}
 
@@ -31,7 +26,7 @@ func TestBadgerStore(t *testing.T) {
 	bch, err := NewBlockchain(genesisConf, store)
 	assert.NoError(t, err)
 
-	coinbase, err := NewCoinbase(100, bobsWallet.PublicKey)
+	coinbase, err := NewCoinbase(100, bob.PublicKey)
 	assert.NoError(t, err)
 	block, err := bch.NewBlock([]Transaction{*coinbase})
 	assert.NoError(t, err)

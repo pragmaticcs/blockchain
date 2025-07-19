@@ -217,7 +217,7 @@ func (n *Node) requestBlocks(peer p2p.Peer) error {
 
 	// Request blocks from our blockchain head
 	msgGetBlocks := p2p.MessageGetBlocks{
-		From: n.StateManager.Blockchain.Head,
+		From: n.StateManager.GetBlockchainHead(),
 	}
 	msgPayload, err := msgGetBlocks.ToBytes()
 	if err != nil {

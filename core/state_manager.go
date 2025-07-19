@@ -26,9 +26,12 @@ type StateManager struct {
 	lock sync.RWMutex // Use when modifying the state of blockchain itself
 }
 
-func NewStateManager(b *Blockchain, w *wallet.Wallet) *StateManager {
+func NewStateManager(b *Blockchain, w *wallet.Wallet) (*StateManager, error) {
 	utxoSet := NewUTXOset(b, b.Store)
-	utxoSet.Reindex()
+	err := utxoSet.Reindex()
+	if err != nil {
+		return nil, err
+	}
 	return &StateManager{
 		Blockchain:       b,
 		Wallet:           w,
@@ -36,7 +39,7 @@ func NewStateManager(b *Blockchain, w *wallet.Wallet) *StateManager {
 		store:            b.Store,
 		miningDifficulty: DefaultDifficulty,
 		lock:             sync.RWMutex{},
-	}
+	}, nil
 }
 
 func (s *StateManager) Close() error {
@@ -47,6 +50,12 @@ func (s *StateManager) GetLatestBlockHeight() uint32 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.Blockchain.CurrHeight
+}
+
+func (s *StateManager) GetBlockchainHead() BlockHash {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.Blockchain.Head
 }
 
 func (s *StateManager) GetBalance() (int, error) {
@@ -152,7 +161,7 @@ func (s *StateManager) Update(block *Block) error {
 
 func (s *StateManager) Send(to wallet.Address, amount int, fee int) error {
 	s.lock.Lock()
-	defer s.lock.Unlock()
+	// defer s.lock.Unlock()
 	tx, err := s.NewTransaction(to, amount, fee)
 	if err != nil {
 		return err
@@ -162,7 +171,8 @@ func (s *StateManager) Send(to wallet.Address, amount int, fee int) error {
 	if err != nil {
 		return err
 	}
-	return s.updateUnlocked(block)
+	s.lock.Unlock()
+	return s.Update(block)
 }
 
 func (s *StateManager) Validate(block *Block) (bool, error) {
