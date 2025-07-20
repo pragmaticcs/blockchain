@@ -96,7 +96,7 @@ func (t *TCPTransport) StartAcceptLoop() {
 			log.Printf("TCP accept error %v\n", err)
 			continue
 		}
-		log.Printf("new incoming connection %s\n", conn.RemoteAddr().String())
+		log.Printf("new incoming connection: [%s]\n", conn.RemoteAddr().String())
 
 		go t.HandleConn(conn)
 	}
@@ -121,16 +121,16 @@ func (t *TCPTransport) HandleConn(conn net.Conn) {
 	log.Println("trying to handshake")
 	err := t.Handshake(peer)
 	if err != nil {
-		log.Printf("handshake with %s failed: %v", peer.GetAddr(), err)
+		log.Printf("handshake with [%s] failed: %v", peer.GetAddr(), err)
 		_ = peer.Close()
 		return
 	}
-	log.Printf("handshake with %s successful", peer.GetAddr())
+	log.Printf("handshake with [%s] successful", peer.GetAddr())
 
 	t.AddPeer(peer)
 
 	defer func() {
-		log.Printf("dropping peer: %s", peer.GetAddr())
+		log.Printf("dropping peer: [%s]", peer.GetAddr())
 		t.RemovePeer(peer)
 		_ = peer.Close()
 	}()
@@ -143,7 +143,7 @@ func (t *TCPTransport) readLoop(peer *TCPPeer) {
 	for {
 		msg, err := decoder.Decode()
 		if err != nil {
-			log.Printf("read error from %s: %v", peer.GetAddr(), err)
+			log.Printf("read error from [%s]: %v", peer.GetAddr(), err)
 			break
 		}
 		t.RpcCh <- RPC{

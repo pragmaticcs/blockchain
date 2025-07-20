@@ -92,9 +92,6 @@ func GetHexValue(i int64) []byte {
 }
 
 func CreateGenesisBlock(value int64, pubKeyHash []byte) (*Block, error) {
-	coinbase, err := NewCoinbase(value, pubKeyHash)
-	if err != nil {
-		return nil, err
-	}
+	coinbase := NewCoinbase(value, pubKeyHash)
 	return NewBlock([]byte{}, []Transaction{*coinbase}, 0)
 }

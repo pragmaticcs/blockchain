@@ -80,7 +80,7 @@ func (s *SyncManager) assignJobLoop(ownHeight uint32) error {
 		for {
 			syncCandidates := s.PeerManager.GetSyncCandidates(ownHeight)
 			if len(syncCandidates) == 0 {
-				log.Panicln("couldn't find peer to assign job to, waiting")
+				log.Println("couldn't find peer to assign job to, waiting")
 				time.Sleep(time.Second)
 				continue
 			}

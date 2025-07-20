@@ -22,6 +22,7 @@ var (
 // Maximum number of goroutines handling different
 // job in the mainloop of the node
 const MaxWorkers int = 8
+const DefaultMineReward = 5
 
 type PeriodicTask func() error
 
@@ -83,7 +84,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	}
 	node := &Node{
 		StateManager:     stateManager,
-		Mempool:          nil,
+		Mempool:          NewMempool(),
 		Transport:        nil,
 		PeerManager:      NewPeerManager(),
 		inFlightRequests: make(map[string]time.Time),
@@ -326,8 +327,7 @@ func (n *Node) itemExists(item p2p.InvVector) bool {
 	case p2p.InvTypeBlock:
 		return n.StateManager.BlockExists(item.Hash)
 	case p2p.InvTypeTx:
-		// TODO: implement mempool
-		return false
+		return n.Mempool.TxExists(item.Hash)
 	}
 	return false
 }
@@ -345,10 +345,32 @@ func (n *Node) HandleRpcGetData(rpc p2p.RPC) error {
 				return err
 			}
 		case p2p.InvTypeTx:
-			return nil
+			err := n.HandleGetDataTx(item, rpc.From)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func (n *Node) HandleGetDataTx(item p2p.InvVector, addr string) error {
+	tx, ok := n.Mempool.GetTransaction(core.TransactionID(item.Hash))
+
+	if !ok {
+		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
+		return n.PeerManager.SendMessage(addr, messageNotFound)
+	}
+
+	msgTx := p2p.MessageTx{
+		Tx: *tx,
+	}
+	payload, err := msgTx.ToBytes()
+	if err != nil {
+		return err
+	}
+	msg := p2p.NewMessage(payload, p2p.RpcCommandTx)
+	return n.PeerManager.SendMessage(addr, msg)
 }
 
 func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
@@ -370,6 +392,10 @@ func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
 	}
 	msg := p2p.NewMessage(payload, p2p.RpcCommandBlock)
 	return n.PeerManager.SendMessage(addr, msg)
+}
+
+func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
+	return nil
 }
 
 func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
@@ -430,14 +456,43 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 	return n.PeerManager.SendMessage(rpc.From, msg)
 }
 
-// func (n *Node) Mine(transactions []core.Transaction) error {
-// 	pow := core.NewPOW(core.DefaultDifficulty)
-// 	block, err := n.StateManager.Blockchain.NewBlock(transactions)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	_ = pow.Run(block)
-// }
+func (n *Node) Mine() error {
+	mempoolTxs := n.Mempool.GetTransactions()
+
+	// Add one to the length for the coinbase mining reward
+	transactions := make([]core.Transaction, 0, len(mempoolTxs)+1)
+
+	// Calculate mining fees
+	miningFees := 0
+	for _, tx := range mempoolTxs {
+		fee, err := n.StateManager.CalculateFee(tx)
+		if err != nil {
+			return err
+		}
+		miningFees += fee
+	}
+
+	coinbase := core.NewCoinbase(int64(DefaultMineReward+miningFees), n.StateManager.Wallet.PublicKey)
+
+	transactions = append(transactions, *coinbase)
+
+	for _, tx := range mempoolTxs {
+		transactions = append(transactions, *tx)
+	}
+
+	pow := core.NewPOW(core.DefaultDifficulty)
+	block, err := n.StateManager.Blockchain.NewBlock(transactions)
+	if err != nil {
+		return err
+	}
+	mined := pow.Run(block)
+	if !mined {
+		// TODO: Handle this better
+		log.Println("error: couldn't mine block :(")
+	}
+
+	return nil
+}
 
 func (n *Node) addInFlightRequests(items []p2p.InvVector) {
 	n.inFlightLock.Lock()

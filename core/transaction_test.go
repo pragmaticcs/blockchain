@@ -7,7 +7,6 @@ import (
 )
 
 func TestCoinbase(t *testing.T) {
-	coinbase, err := NewCoinbase(1000000, []byte("my public key"))
-	assert.NoError(t, err)
+	coinbase := NewCoinbase(1000000, []byte("my public key"))
 	assert.True(t, coinbase.IsCoinbase())
 }

@@ -26,8 +26,7 @@ func TestBadgerStore(t *testing.T) {
 	bch, err := NewBlockchain(genesisConf, store)
 	assert.NoError(t, err)
 
-	coinbase, err := NewCoinbase(100, bob.PublicKey)
-	assert.NoError(t, err)
+	coinbase := NewCoinbase(100, bob.PublicKey)
 	block, err := bch.NewBlock([]Transaction{*coinbase})
 	assert.NoError(t, err)
 	err = bch.AddBlock(block)

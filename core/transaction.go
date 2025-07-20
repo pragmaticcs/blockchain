@@ -82,7 +82,7 @@ func (in *TxInput) GetData() []byte {
 	}, []byte{})
 }
 
-func NewCoinbase(value int64, pubKeyHash []byte) (*Transaction, error) {
+func NewCoinbase(value int64, pubKeyHash []byte) *Transaction {
 	txOut := TxOutput{
 		Value:      value,
 		PubKeyHash: pubKeyHash,
@@ -98,7 +98,7 @@ func NewCoinbase(value int64, pubKeyHash []byte) (*Transaction, error) {
 		Outputs: []TxOutput{txOut},
 	}
 	coinbase.ID = coinbase.GetHash()
-	return coinbase, nil
+	return coinbase
 }
 
 func (t *Transaction) IsCoinbase() bool {

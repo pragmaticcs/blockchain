@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -78,6 +79,19 @@ func (p *PeerManager) SendMessage(addr string, msg *p2p.Message) error {
 	}
 	encoder := p2p.NewMessageEncoder(peerState.peer)
 	return encoder.Encode(msg)
+}
+
+func (p *PeerManager) Broadcast(msg *p2p.Message) {
+	syncPeers := p.GetBroadcastCandidates()
+
+	var msgEncoder p2p.MessageEncoder
+	for _, peer := range syncPeers {
+		msgEncoder = *p2p.NewMessageEncoder(peer)
+		err := msgEncoder.Encode(msg)
+		if err != nil {
+			log.Printf("broadcast error to peer [%s]: %s", peer.GetAddr(), err)
+		}
+	}
 }
 
 func (p *PeerManager) RemovePeer(peer p2p.Peer) {
