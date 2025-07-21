@@ -39,7 +39,7 @@ type BadgerStore struct {
 }
 
 func NewBadgerStore(path string) (*BadgerStore, error) {
-	opts := badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR)
+	opts := badger.DefaultOptions(path).WithLoggingLevel(badger.ERROR)
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err

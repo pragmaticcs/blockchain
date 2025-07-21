@@ -2,11 +2,9 @@ package main
 
 import (
 	"log"
-	"os"
 	"time"
 
 	"github.com/pragmaticcs/blockchain/node"
-	"github.com/pragmaticcs/blockchain/wallet"
 )
 
 func handle(err error) {
@@ -16,38 +14,41 @@ func handle(err error) {
 }
 
 func main() {
-	dir, _ := os.Getwd()
+	// bobWallet, err := wallet.LoadWalletFromFile("data/bob", "bob")
+	// handle(err)
 
-	aliceWallet, err := wallet.LoadWalletFromFile(dir, "alice")
-	handle(err)
+	// bobAddr, _ := bobWallet.GetAddress()
 
-	aliceAddr, _ := aliceWallet.GetAddress()
+	// aliceWallet, err := wallet.LoadWalletFromFile("data/alice", "alice")
+	// handle(err)
+
+	// aliceAddr, _ := aliceWallet.GetAddress()
 
 	firstNodeOpts := node.NodeOpts{
 		Port:                  "localhost:3000",
 		SeedNodes:             nil,
 		WalletName:            "satoshi",
-		WalletDir:             dir,
-		BlockchainDatabaseDir: dir,
-		GenesisConfigDir:      dir,
+		WalletDir:             "data/satoshi",
+		BlockchainDatabaseDir: "data/satoshi/badger",
+		GenesisConfigDir:      "data/satoshi",
 	}
 
 	secondNodeOpts := node.NodeOpts{
 		Port:                  "localhost:3333",
 		SeedNodes:             []string{"localhost:3000"},
 		WalletName:            "alice",
-		WalletDir:             dir,
-		BlockchainDatabaseDir: dir,
-		GenesisConfigDir:      dir,
+		WalletDir:             "data/alice",
+		BlockchainDatabaseDir: "data/alice/badger",
+		GenesisConfigDir:      "data/alice",
 	}
 
 	thirdNodeOpts := node.NodeOpts{
 		Port:                  "localhost:5555",
 		SeedNodes:             []string{"localhost:3333", "localhost:3000"},
 		WalletName:            "bob",
-		WalletDir:             dir,
-		BlockchainDatabaseDir: dir,
-		GenesisConfigDir:      dir,
+		WalletDir:             "data/bob",
+		BlockchainDatabaseDir: "data/bob/badger",
+		GenesisConfigDir:      "data/bob",
 	}
 
 	firstNode, err := node.NewNode(firstNodeOpts)
@@ -82,12 +83,12 @@ func main() {
 		handle(err)
 	}()
 
-	log.Println("sleeping 3 seconds")
-	time.Sleep(5 * time.Second)
+	// log.Println("sleeping 3 seconds")
+	// time.Sleep(3 * time.Second)
 
-	log.Println("EXECUTING TRANSACTION")
-	err = firstNode.Send(aliceAddr, 10, 3)
-	handle(err)
+	// log.Println("EXECUTING TRANSACTION")
+	// err = secondNode.Send(bobAddr, 5, 1)
+	// handle(err)
 
 	select {}
 }

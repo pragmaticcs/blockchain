@@ -145,6 +145,10 @@ func (s *StateManager) Validate(block *Block) (bool, error) {
 		return false, nil
 	}
 	for _, tx := range block.Transactions {
+		if tx.IsCoinbase() {
+			// TODO: Check if mining reward is the default one
+			continue
+		}
 		valid, err := s.Blockchain.VerifyTransaction(&tx)
 		if err != nil {
 			return false, err
