@@ -36,6 +36,14 @@ func (m *Mempool) GetTransaction(txID core.TransactionID) (*core.Transaction, bo
 	return tx, ok
 }
 
+func (m *Mempool) Clear(newBlock *core.Block) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	for _, tx := range newBlock.Transactions {
+		delete(m.transactions, tx.ID)
+	}
+}
+
 func (m *Mempool) TxExists(txID []byte) bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()

@@ -17,6 +17,7 @@ import (
 
 var (
 	ErrInvalidBlock = NewNodeError("block is not valid")
+	ErrInvalidTx    = NewNodeError("transaction is not valid")
 )
 
 // Maximum number of goroutines handling different
@@ -53,6 +54,7 @@ type Node struct {
 	Transport    *p2p.TCPTransport // TODO: Replace with Transport interface
 	SyncManager  *SyncManager
 	PeerManager  *PeerManager
+	Miner        *Miner
 
 	// Keep track of current requests
 	inFlightRequests map[string]time.Time
@@ -87,6 +89,8 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		Mempool:          NewMempool(),
 		Transport:        nil,
 		PeerManager:      NewPeerManager(),
+		SyncManager:      nil,
+		Miner:            nil,
 		inFlightRequests: make(map[string]time.Time),
 		inFlightLock:     sync.RWMutex{},
 		rpcCh:            make(chan p2p.RPC, 100),
@@ -101,6 +105,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	}
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
+	node.Miner = NewMiner(node)
 	return node, err
 }
 
@@ -122,6 +127,7 @@ func (n *Node) rpcWorker() {
 
 func (n *Node) Start() error {
 	n.launchWorkerPool(MaxWorkers)
+	n.Miner.Start()
 	go n.MainLoop()
 	err := n.Transport.ListenAndServe()
 	if err != nil {
@@ -135,6 +141,7 @@ func (n *Node) Stop() {
 	n.sendQuitSignal()
 	close(n.quitCh)
 	close(n.rpcCh)
+	n.ticker.Stop()
 	_ = n.Transport.Close()
 	_ = n.StateManager.Close()
 }
@@ -177,17 +184,16 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 	case p2p.RpcCommandGetAddr:
 		return n.HandleRpcGetAddr(rpc)
 	case p2p.RpcCommandTx:
+		return n.HandleRpcTx(rpc)
 	case p2p.RpcCommandGetBlocks:
 		return n.HandleRpcGetBlocks(rpc)
 	case p2p.RpcCommandGetData:
 		return n.HandleRpcGetData(rpc)
 	case p2p.RpcCommandNotFound:
-		log.Println("NOT FOUND")
-		return nil
+		return n.HandleRpcNotFound(rpc)
 	default:
 		return nil
 	}
-	return nil
 }
 
 func (n *Node) Handshake(peer p2p.Peer) error {
@@ -261,6 +267,7 @@ func (n *Node) RequestAddr(peer p2p.Peer) error {
 
 func (n *Node) HandleRpcNotFound(rpc p2p.RPC) error {
 	// TODO: Handle Not Found response here and in sync manager
+	log.Printf("NOT FOUND msg from %s", rpc.From)
 	return nil
 }
 
@@ -395,6 +402,26 @@ func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
 }
 
 func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
+	msgTx, err := rpc.VisitAsMessageTx()
+	if err != nil {
+		return err
+	}
+
+	if n.Mempool.TxExists(msgTx.Tx.ID[:]) {
+		return nil
+	}
+
+	valid, _ := n.StateManager.Blockchain.VerifyTransaction(&msgTx.Tx)
+	if !valid {
+		// Penalize peer for invalid tx
+		n.PeerManager.PenalizePeer(20, rpc.From)
+		return ErrInvalidTx
+	}
+
+	n.Mempool.AddTx(&msgTx.Tx)
+	n.Miner.StartMining()
+
+	n.BroadcastInv(msgTx.Tx.ID[:], p2p.InvTypeTx)
 	return nil
 }
 
@@ -403,13 +430,25 @@ func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
 		// Delegate the task to Sync Manager
 		return n.SyncManager.HandleRpcBlock(rpc)
 	}
+
 	msgBlock, err := rpc.VisitAsMessageBlock()
 	if err != nil {
 		return err
 	}
 	block := &msgBlock.Block
 
-	return n.ProcessBlock(block)
+	err = n.ProcessBlock(block)
+	if err == ErrInvalidBlock {
+		n.PeerManager.PenalizePeer(30, rpc.From)
+		return nil
+	}
+	// Stop mining and remove txs from the mempool that have been mined
+	n.Miner.Reset()
+	n.Mempool.Clear(block)
+
+	// Broadcast new block to peers
+	n.BroadcastInv(block.GetHash(), p2p.InvTypeBlock)
+	return err
 }
 
 func (n *Node) ProcessBlock(block *core.Block) error {
@@ -421,6 +460,7 @@ func (n *Node) ProcessBlock(block *core.Block) error {
 		return ErrInvalidBlock
 	}
 	log.Printf("processed block %s", hex.EncodeToString(block.GetHash()))
+
 	return n.StateManager.Update(block)
 }
 
@@ -456,42 +496,49 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 	return n.PeerManager.SendMessage(rpc.From, msg)
 }
 
-func (n *Node) Mine() error {
-	mempoolTxs := n.Mempool.GetTransactions()
-
-	// Add one to the length for the coinbase mining reward
-	transactions := make([]core.Transaction, 0, len(mempoolTxs)+1)
-
-	// Calculate mining fees
-	miningFees := 0
-	for _, tx := range mempoolTxs {
-		fee, err := n.StateManager.CalculateFee(tx)
-		if err != nil {
-			return err
-		}
-		miningFees += fee
+func (n *Node) BroadcastInv(hash []byte, invType p2p.InvType) {
+	msgInv := p2p.MessageInv{
+		Items: []p2p.InvVector{
+			{
+				Type: p2p.InvTypeBlock,
+				Hash: hash,
+			},
+		},
 	}
+	payload, _ := msgInv.ToBytes()
+	msg := p2p.NewMessage(payload, p2p.RpcCommandInv)
+	n.PeerManager.Broadcast(msg)
+}
 
-	coinbase := core.NewCoinbase(int64(DefaultMineReward+miningFees), n.StateManager.Wallet.PublicKey)
+func (n *Node) RequestBlocks(peer p2p.Peer) error {
+	log.Printf("attempting syncing with peer %s", peer.GetAddr())
 
-	transactions = append(transactions, *coinbase)
-
-	for _, tx := range mempoolTxs {
-		transactions = append(transactions, *tx)
+	// Request blocks from our blockchain head
+	msgGetBlocks := p2p.MessageGetBlocks{
+		From: n.StateManager.GetBlockchainHead(),
 	}
-
-	pow := core.NewPOW(core.DefaultDifficulty)
-	block, err := n.StateManager.Blockchain.NewBlock(transactions)
+	msgPayload, err := msgGetBlocks.ToBytes()
 	if err != nil {
 		return err
 	}
-	mined := pow.Run(block)
-	if !mined {
-		// TODO: Handle this better
-		log.Println("error: couldn't mine block :(")
-	}
+	msg := p2p.NewMessage(msgPayload, p2p.RpcCommandGetBlocks)
 
-	return nil
+	return n.PeerManager.SendMessage(peer.GetAddr(), msg)
+}
+
+func (n *Node) RequestItems(peer p2p.Peer, items []p2p.InvVector) error {
+	log.Printf("requesting items from peer %s", peer.GetAddr())
+
+	msgGetData := p2p.MessageGetData{
+		Items: items,
+	}
+	msgPayload, err := msgGetData.ToBytes()
+	if err != nil {
+		return err
+	}
+	msg := p2p.NewMessage(msgPayload, p2p.RpcCommandGetData)
+
+	return n.PeerManager.SendMessage(peer.GetAddr(), msg)
 }
 
 func (n *Node) addInFlightRequests(items []p2p.InvVector) {

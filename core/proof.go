@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"math"
 	"math/big"
 )
@@ -20,20 +21,27 @@ func NewPOW(difficulty uint32) *POW {
 	}
 }
 
-func (p *POW) Run(b *Block) bool {
+func (p *POW) Run(ctx context.Context, b *Block) bool {
 	// Return the hash of the block
 	var intHash big.Int
 
 	b.Difficulty = p.Difficulty
 	mined := false
+MiningLoop:
 	for b.Nonce = 0; b.Nonce < math.MaxInt32; b.Nonce++ {
-		hash := b.GetHash()
-		intHash.SetBytes(hash[:])
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+			hash := b.GetHash()
+			intHash.SetBytes(hash[:])
 
-		if intHash.Cmp(p.Target) == -1 { // Check if we found a value that is smaller than target
-			mined = true
-			break
+			if intHash.Cmp(p.Target) == -1 { // Check if we found a value that is smaller than target
+				mined = true
+				break MiningLoop
+			}
 		}
+
 	}
 	return mined
 }

@@ -70,7 +70,7 @@ func (s *SyncManager) attemptSync() error {
 	s.lock.Unlock()
 
 	go s.assignJobLoop(ownHeight)
-	return s.Node.requestBlocks(invPeer)
+	return s.Node.RequestBlocks(invPeer)
 }
 
 func (s *SyncManager) assignJobLoop(ownHeight uint32) error {
@@ -106,7 +106,7 @@ func (s *SyncManager) assignJobToPeer(job *DownloadJob, peer p2p.Peer) error {
 	job.AssignedAt = time.Now()
 	job.AssignedTo = peer
 	s.addInFlightRequests(job.Items, job)
-	s.Node.requestItems(peer, job.Items)
+	s.Node.RequestItems(peer, job.Items)
 	return nil
 }
 
@@ -210,37 +210,6 @@ func (s *SyncManager) processPendingBlocks() error {
 func (s *SyncManager) finishSync() {
 	s.syncing = false
 	s.invPeer = nil
-}
-
-func (n *Node) requestBlocks(peer p2p.Peer) error {
-	log.Printf("attempting syncing with peer %s", peer.GetAddr())
-
-	// Request blocks from our blockchain head
-	msgGetBlocks := p2p.MessageGetBlocks{
-		From: n.StateManager.GetBlockchainHead(),
-	}
-	msgPayload, err := msgGetBlocks.ToBytes()
-	if err != nil {
-		return err
-	}
-	msg := p2p.NewMessage(msgPayload, p2p.RpcCommandGetBlocks)
-
-	return n.PeerManager.SendMessage(peer.GetAddr(), msg)
-}
-
-func (n *Node) requestItems(peer p2p.Peer, items []p2p.InvVector) error {
-	log.Printf("requesting items from peer %s", peer.GetAddr())
-
-	msgGetData := p2p.MessageGetData{
-		Items: items,
-	}
-	msgPayload, err := msgGetData.ToBytes()
-	if err != nil {
-		return err
-	}
-	msg := p2p.NewMessage(msgPayload, p2p.RpcCommandGetData)
-
-	return n.PeerManager.SendMessage(peer.GetAddr(), msg)
 }
 
 func (s *SyncManager) addInFlightRequests(items []p2p.InvVector, job *DownloadJob) {

@@ -162,22 +162,22 @@ func (p *PeerManager) FindSyncPeer(ownHeight uint32) (p2p.Peer, bool) {
 	return bestPeer, true
 }
 
-func (p *PeerManager) PenalizePeer(penalty int, peer p2p.Peer) {
+func (p *PeerManager) PenalizePeer(penalty int, peerAddr string) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	state, ok := p.getPeerUnlocked(peer.GetAddr())
+	state, ok := p.getPeerUnlocked(peerAddr)
 	if !ok {
 		return
 	}
 	state.Score -= penalty
 }
 
-func (p *PeerManager) RewardPeer(reward int, peer p2p.Peer) {
+func (p *PeerManager) RewardPeer(reward int, peerAddr string) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	state, ok := p.getPeerUnlocked(peer.GetAddr())
+	state, ok := p.getPeerUnlocked(peerAddr)
 	if !ok {
 		return
 	}

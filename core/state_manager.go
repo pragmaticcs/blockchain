@@ -18,7 +18,7 @@ type StateManager struct {
 	UtxoSet    *UTXOset
 	Wallet     *wallet.Wallet
 	// Copy of pointer to store to handle closing
-	store Store
+	Store Store
 
 	miningDifficulty uint32
 
@@ -36,14 +36,14 @@ func NewStateManager(b *Blockchain, w *wallet.Wallet) (*StateManager, error) {
 		Blockchain:       b,
 		Wallet:           w,
 		UtxoSet:          utxoSet,
-		store:            b.Store,
+		Store:            b.Store,
 		miningDifficulty: DefaultDifficulty,
 		lock:             sync.RWMutex{},
 	}, nil
 }
 
 func (s *StateManager) Close() error {
-	return s.store.Close()
+	return s.Store.Close()
 }
 
 func (s *StateManager) GetLatestBlockHeight() uint32 {
@@ -124,7 +124,7 @@ func (s *StateManager) Mine(transactions []Transaction) (*Block, error) {
 	pow := NewPOW(s.miningDifficulty)
 
 	// TODO: handle if couldn't mine the block
-	_ = pow.Run(block)
+	_ = pow.Run(nil, block)
 
 	return block, err
 }
@@ -132,21 +132,13 @@ func (s *StateManager) Mine(transactions []Transaction) (*Block, error) {
 func (s *StateManager) BlockExists(hash BlockHash) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return s.store.Exists(hash)
+	return s.Store.Exists(hash)
 }
 
 func (s *StateManager) GetBlock(hash BlockHash) (*Block, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return s.store.GetBlock(hash)
-}
-
-func (s *StateManager) updateUnlocked(block *Block) error {
-	err := s.Blockchain.AddBlock(block)
-	if err != nil {
-		return err
-	}
-	return s.UtxoSet.Update(block)
+	return s.Store.GetBlock(hash)
 }
 
 func (s *StateManager) Update(block *Block) error {
