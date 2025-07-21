@@ -257,6 +257,8 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 func (n *Node) HandlePeriodicTasks() error {
 	peers := n.PeerManager.GetBroadcastCandidates()
 	log.Printf("connected to %d peers", len(peers))
+	balance, _ := n.StateManager.GetBalance()
+	log.Printf("current balance = %d", balance)
 	return nil
 }
 
@@ -402,6 +404,7 @@ func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
 }
 
 func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
+	log.Println("fn <HandleRpcTx>: recived new tx")
 	msgTx, err := rpc.VisitAsMessageTx()
 	if err != nil {
 		return err
@@ -412,11 +415,14 @@ func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
 	}
 
 	valid, _ := n.StateManager.Blockchain.VerifyTransaction(&msgTx.Tx)
+
 	if !valid {
 		// Penalize peer for invalid tx
 		n.PeerManager.PenalizePeer(20, rpc.From)
 		return ErrInvalidTx
 	}
+
+	log.Println("fn <HandleRpcTx>: verified transaction")
 
 	n.Mempool.AddTx(&msgTx.Tx)
 	n.Miner.StartMining()
@@ -442,13 +448,16 @@ func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
 		n.PeerManager.PenalizePeer(30, rpc.From)
 		return nil
 	}
+	if err != nil {
+		return err
+	}
 	// Stop mining and remove txs from the mempool that have been mined
 	n.Miner.Reset()
 	n.Mempool.Clear(block)
 
 	// Broadcast new block to peers
 	n.BroadcastInv(block.GetHash(), p2p.InvTypeBlock)
-	return err
+	return nil
 }
 
 func (n *Node) ProcessBlock(block *core.Block) error {
@@ -500,7 +509,7 @@ func (n *Node) BroadcastInv(hash []byte, invType p2p.InvType) {
 	msgInv := p2p.MessageInv{
 		Items: []p2p.InvVector{
 			{
-				Type: p2p.InvTypeBlock,
+				Type: invType,
 				Hash: hash,
 			},
 		},
@@ -539,6 +548,18 @@ func (n *Node) RequestItems(peer p2p.Peer, items []p2p.InvVector) error {
 	msg := p2p.NewMessage(msgPayload, p2p.RpcCommandGetData)
 
 	return n.PeerManager.SendMessage(peer.GetAddr(), msg)
+}
+
+func (n *Node) Send(to wallet.Address, amount, fee int) error {
+	tx, err := n.StateManager.NewTransaction(to, amount, fee)
+	if err != nil {
+		return err
+	}
+	n.Mempool.AddTx(tx)
+	n.Miner.StartMining()
+
+	n.BroadcastInv(tx.ID[:], p2p.InvTypeTx)
+	return nil
 }
 
 func (n *Node) addInFlightRequests(items []p2p.InvVector) {

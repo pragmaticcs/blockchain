@@ -29,7 +29,10 @@ func (m *Miner) Start() {
 }
 
 func (m *Miner) StartMining() {
-	m.startMining <- struct{}{}
+	select {
+	case m.startMining <- struct{}{}:
+	default:
+	}
 }
 
 func (m *Miner) Stop() {
@@ -50,19 +53,24 @@ func (m *Miner) MineLoop() {
 
 		m.currCtx, m.currCancelFunc = context.WithCancel(context.Background())
 
-		go m.Mine(m.currCtx)
+		go func() {
+			err := m.Mine(m.currCtx)
+			if err != nil {
+				log.Printf("error during mining: %s", err)
+			}
+		}()
 	}
 }
 
 func (m *Miner) Reset() {
 	if m.currCancelFunc != nil {
-		log.Println("Miner resetting mining process")
+		log.Println("miner resetting mining process")
 		m.currCancelFunc()
 	}
 }
 
 func (m *Miner) Mine(ctx context.Context) error {
-	log.Println("Miner started mining")
+	log.Println("miner started mining new block")
 
 	m.isMining = true
 	defer func() {
@@ -74,7 +82,7 @@ func (m *Miner) Mine(ctx context.Context) error {
 	// Add one to the length for the coinbase mining reward
 	transactions := make([]core.Transaction, 0, len(mempoolTxs)+1)
 
-	// Calculate mining fees
+	// // Calculate mining fees
 	miningFees := 0
 	for _, tx := range mempoolTxs {
 		fee, err := m.Node.StateManager.CalculateFee(tx)
@@ -84,7 +92,7 @@ func (m *Miner) Mine(ctx context.Context) error {
 		miningFees += fee
 	}
 
-	coinbase := core.NewCoinbase(int64(DefaultMineReward+miningFees), m.Node.StateManager.Wallet.PublicKey)
+	coinbase := core.NewCoinbase(int64(DefaultMineReward), m.Node.StateManager.Wallet.PublicKey)
 
 	transactions = append(transactions, *coinbase)
 
@@ -102,6 +110,9 @@ func (m *Miner) Mine(ctx context.Context) error {
 		// TODO: Handle this better
 		return nil
 	}
+	log.Println("miner successfully mined block")
+
+	m.Node.StateManager.Update(block)
 
 	m.Node.Mempool.Clear(block)
 	m.Node.BroadcastInv(block.GetHash(), p2p.InvTypeBlock)

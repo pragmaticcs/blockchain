@@ -68,22 +68,26 @@ func main() {
 		handle(err)
 	}()
 
-	for range 10 {
-		err = firstNode.StateManager.Send(aliceAddr, 1, 0)
-		handle(err)
-	}
-
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	go func() {
 		err := secondNode.Start()
 		handle(err)
 	}()
 
+	time.Sleep(1 * time.Second)
+
 	go func() {
 		err := thirdNode.Start()
 		handle(err)
 	}()
+
+	log.Println("sleeping 3 seconds")
+	time.Sleep(5 * time.Second)
+
+	log.Println("EXECUTING TRANSACTION")
+	err = firstNode.Send(aliceAddr, 10, 3)
+	handle(err)
 
 	select {}
 }

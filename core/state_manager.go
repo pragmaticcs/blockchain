@@ -10,7 +10,7 @@ import (
 
 // Just for testing purposes
 const (
-	DefaultDifficulty = 10
+	DefaultDifficulty = 24
 )
 
 type StateManager struct {
@@ -68,7 +68,7 @@ func (s *StateManager) GetBalance() (int, error) {
 	return s.UtxoSet.FindSpendableAmount(pubKeyHash)
 }
 
-func (s *StateManager) NewTransaction(to wallet.Address, amount int, fee int) (*Transaction, error) {
+func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -80,8 +80,9 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount int, fee int) (*
 	if err != nil {
 		return nil, err
 	}
-	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, amount+fee)
-	if sum < int64(amount) {
+	needed := int64(amount + fee)
+	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, int(needed))
+	if sum < needed {
 		return nil, wallet.ErrorInsufficientBalance
 	}
 	for _, outPoint := range outPoints {
@@ -93,9 +94,10 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount int, fee int) (*
 		}
 		inputs = append(inputs, in)
 	}
-	outputs = append(outputs, *NewTxOutput(amount, []byte(to))) // Transfer to reciever
-	if sum > int64(amount) {
-		outputs = append(outputs, *NewTxOutput(int(sum)-amount, []byte(selfAddress))) // Transfer change back
+	outputs = append(outputs, *NewTxOutput(int64(amount), []byte(to))) // Transfer to reciever
+
+	if sum > needed {
+		outputs = append(outputs, *NewTxOutput(sum-needed, []byte(selfAddress))) // Transfer change back
 	}
 
 	tx := &Transaction{
@@ -112,21 +114,6 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount int, fee int) (*
 		return nil, err
 	}
 	return tx, nil
-}
-
-func (s *StateManager) Mine(transactions []Transaction) (*Block, error) {
-	block, err := s.Blockchain.NewBlock(transactions)
-	if err != nil {
-		return nil, err
-	}
-	// Run the proof of work
-	// TODO: Implement a calculateDifficulty function
-	pow := NewPOW(s.miningDifficulty)
-
-	// TODO: handle if couldn't mine the block
-	_ = pow.Run(nil, block)
-
-	return block, err
 }
 
 func (s *StateManager) BlockExists(hash BlockHash) bool {
@@ -149,22 +136,6 @@ func (s *StateManager) Update(block *Block) error {
 		return err
 	}
 	return s.UtxoSet.Update(block)
-}
-
-func (s *StateManager) Send(to wallet.Address, amount int, fee int) error {
-	s.lock.Lock()
-	// defer s.lock.Unlock()
-	tx, err := s.NewTransaction(to, amount, fee)
-	if err != nil {
-		return err
-	}
-	fmt.Println("Mining new block with transactions")
-	block, err := s.Mine([]Transaction{*tx})
-	if err != nil {
-		return err
-	}
-	s.lock.Unlock()
-	return s.Update(block)
 }
 
 func (s *StateManager) Validate(block *Block) (bool, error) {

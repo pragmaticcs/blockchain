@@ -57,9 +57,9 @@ func (out *TxOutput) GetData() []byte {
 	}, []byte{})
 }
 
-func NewTxOutput(value int, address []byte) *TxOutput {
+func NewTxOutput(value int64, address []byte) *TxOutput {
 	out := &TxOutput{
-		Value:      int64(value),
+		Value:      value,
 		PubKeyHash: nil,
 	}
 	LockOutput(out, address)
@@ -225,6 +225,9 @@ func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
 }
 
 func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) error {
+	if tx.IsCoinbase() {
+		return NewTransactionError("coinbase can't be signed")
+	}
 	prevTxs := make(map[TransactionID]Transaction)
 	for _, in := range tx.Inputs {
 		prevTx, err := b.FindTransaction(in.TxID)
@@ -237,6 +240,9 @@ func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKe
 }
 
 func (b *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
+	if tx.IsCoinbase() {
+		return true, nil
+	}
 	prevTxs := make(map[TransactionID]Transaction)
 
 	for _, in := range tx.Inputs {

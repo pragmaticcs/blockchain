@@ -174,7 +174,8 @@ func (b *BadgerStore) GetUTXO(outpoint OutPoint) (*TxOutput, error) {
 		if err != nil {
 			return err
 		}
-		item, err := txn.Get(outPointData)
+		key := utxoPrefix.ConstructKey(outPointData)
+		item, err := txn.Get(key)
 		if err != nil {
 			return err
 		}

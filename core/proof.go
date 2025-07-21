@@ -26,8 +26,7 @@ func (p *POW) Run(ctx context.Context, b *Block) bool {
 	var intHash big.Int
 
 	b.Difficulty = p.Difficulty
-	mined := false
-MiningLoop:
+
 	for b.Nonce = 0; b.Nonce < math.MaxInt32; b.Nonce++ {
 		select {
 		case <-ctx.Done():
@@ -37,13 +36,12 @@ MiningLoop:
 			intHash.SetBytes(hash[:])
 
 			if intHash.Cmp(p.Target) == -1 { // Check if we found a value that is smaller than target
-				mined = true
-				break MiningLoop
+				return true
 			}
 		}
 
 	}
-	return mined
+	return false
 }
 
 func (p *POW) Validate(b *Block) bool {
