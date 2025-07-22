@@ -175,6 +175,11 @@ func (t *TCPTransport) HandleNewPeer(addr string) bool {
 		return false
 	}
 
+	ownAddr := t.GetAddr()
+	if addr == ownAddr {
+		return false
+	}
+
 	conn, err := t.Connect(addr)
 	if err != nil {
 		log.Printf("couldn't connect to peer at addr [%s]", addr)

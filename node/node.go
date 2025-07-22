@@ -55,6 +55,7 @@ type Node struct {
 	SyncManager  *SyncManager
 	PeerManager  *PeerManager
 	Miner        *Miner
+	IpcServer    *IpcServer
 
 	// Keep track of current requests
 	inFlightRequests map[string]time.Time
@@ -84,6 +85,10 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the state manager: %s", err))
 	}
+	ipcServer, err := NewIpcServer(opts.GenesisConfigDir)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
+	}
 	node := &Node{
 		StateManager:     stateManager,
 		Mempool:          NewMempool(),
@@ -91,6 +96,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		PeerManager:      NewPeerManager(),
 		SyncManager:      nil,
 		Miner:            nil,
+		IpcServer:        ipcServer,
 		inFlightRequests: make(map[string]time.Time),
 		inFlightLock:     sync.RWMutex{},
 		rpcCh:            make(chan p2p.RPC, 100),
@@ -126,6 +132,7 @@ func (n *Node) rpcWorker() {
 }
 
 func (n *Node) Start() error {
+	n.IpcServer.Start()
 	n.launchWorkerPool(MaxWorkers)
 	n.Miner.Start()
 	go n.MainLoop()
@@ -144,6 +151,7 @@ func (n *Node) Stop() {
 	n.ticker.Stop()
 	_ = n.Transport.Close()
 	_ = n.StateManager.Close()
+	n.IpcServer.Stop()
 }
 
 func (n *Node) sendQuitSignal() {
@@ -162,6 +170,8 @@ func (n *Node) MainLoop() {
 		case rpc := <-n.Transport.Consume():
 			// Redirect rpc to workerpool
 			n.rpcCh <- rpc
+		case ipc := <-n.IpcServer.Consume():
+			go n.HandleIpc(ipc)
 		case <-n.syncCh:
 			go n.SyncManager.attemptSync()
 		case <-n.ticker.C:
@@ -171,6 +181,16 @@ func (n *Node) MainLoop() {
 			return
 		}
 	}
+}
+
+func (n *Node) HandleIpc(ipc IPC) error {
+	switch ipc.Command {
+	case IpcCommandStop:
+		n.sendQuitSignal()
+	default:
+		return nil
+	}
+	return nil
 }
 
 func (n *Node) HandleRpc(rpc p2p.RPC) error {
@@ -294,9 +314,14 @@ func (n *Node) HandleRpcAddr(rpc p2p.RPC) error {
 	if err != nil {
 		return NewNodeError("couldn't decode message addr")
 	}
+	ownAddr := n.Transport.GetAddr()
 	for _, addr := range msgAddr.AddrList {
+		_, peerExists := n.PeerManager.GetPeer(addr)
+		if peerExists || addr == ownAddr {
+			continue
+		}
 		log.Printf("got new peer addr %s", addr)
-		n.Transport.HandleNewPeer(addr)
+		go n.Transport.HandleNewPeer(addr)
 	}
 	return nil
 }

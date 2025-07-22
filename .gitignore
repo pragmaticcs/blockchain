@@ -1,2 +1,3 @@
 bin/
-badger/
+db/
+*.log
