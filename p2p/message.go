@@ -63,8 +63,10 @@ func (d *MessageDecoder) Decode() (*Message, error) {
 		return nil, NewMessageError(fmt.Sprintf("invalid magic number %x", header.Magic))
 	}
 
-	// TODO: Add a check for maximum payload length
-	// to prevent allocating too much memory
+	if header.Length > msgPayloadMaxLength {
+		return nil, NewMessageError("message payload size is larger than maximum allowed size")
+	}
+
 	payload := make([]byte, header.Length)
 	err = binary.Read(d.r, binary.LittleEndian, payload)
 	if err != nil {

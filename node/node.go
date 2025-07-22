@@ -85,10 +85,6 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the state manager: %s", err))
 	}
-	ipcServer, err := NewIpcServer(opts.GenesisConfigDir)
-	if err != nil {
-		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
-	}
 	node := &Node{
 		StateManager:     stateManager,
 		Mempool:          NewMempool(),
@@ -96,7 +92,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		PeerManager:      NewPeerManager(),
 		SyncManager:      nil,
 		Miner:            nil,
-		IpcServer:        ipcServer,
+		IpcServer:        nil,
 		inFlightRequests: make(map[string]time.Time),
 		inFlightLock:     sync.RWMutex{},
 		rpcCh:            make(chan p2p.RPC, 100),
@@ -112,6 +108,11 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
 	node.Miner = NewMiner(node)
+	ipcServer, err := NewIpcServer(opts.WalletDir, node)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
+	}
+	node.IpcServer = ipcServer
 	return node, err
 }
 
@@ -132,9 +133,9 @@ func (n *Node) rpcWorker() {
 }
 
 func (n *Node) Start() error {
-	n.IpcServer.Start()
 	n.launchWorkerPool(MaxWorkers)
 	n.Miner.Start()
+	go n.IpcServer.Start()
 	go n.MainLoop()
 	err := n.Transport.ListenAndServe()
 	if err != nil {
@@ -145,13 +146,14 @@ func (n *Node) Start() error {
 
 func (n *Node) Stop() {
 	// Handles graceful shutdown
+	log.Panicln("stopping and clearing resources")
 	n.sendQuitSignal()
+	n.IpcServer.Stop()
 	close(n.quitCh)
 	close(n.rpcCh)
 	n.ticker.Stop()
 	_ = n.Transport.Close()
 	_ = n.StateManager.Close()
-	n.IpcServer.Stop()
 }
 
 func (n *Node) sendQuitSignal() {
@@ -170,8 +172,6 @@ func (n *Node) MainLoop() {
 		case rpc := <-n.Transport.Consume():
 			// Redirect rpc to workerpool
 			n.rpcCh <- rpc
-		case ipc := <-n.IpcServer.Consume():
-			go n.HandleIpc(ipc)
 		case <-n.syncCh:
 			go n.SyncManager.attemptSync()
 		case <-n.ticker.C:
@@ -181,16 +181,6 @@ func (n *Node) MainLoop() {
 			return
 		}
 	}
-}
-
-func (n *Node) HandleIpc(ipc IPC) error {
-	switch ipc.Command {
-	case IpcCommandStop:
-		n.sendQuitSignal()
-	default:
-		return nil
-	}
-	return nil
 }
 
 func (n *Node) HandleRpc(rpc p2p.RPC) error {
