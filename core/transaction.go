@@ -88,8 +88,8 @@ func NewCoinbase(value int64, pubKeyHash []byte) *Transaction {
 		PubKeyHash: pubKeyHash,
 	}
 	txIn := TxInput{
-		TxID:  [32]byte{}, // Empty ID
-		OutID: -1,         // No Reference
+		TxID:  TransactionZeroID, // Empty ID
+		OutID: -1,                // No Reference
 		Sig:   nil,
 	}
 	coinbase := &Transaction{

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/pragmaticcs/blockchain/core"
+	"github.com/pragmaticcs/blockchain/crypto"
 	"github.com/pragmaticcs/blockchain/p2p"
 )
 
@@ -82,7 +83,7 @@ func (m *Miner) Mine(ctx context.Context) error {
 	// Add one to the length for the coinbase mining reward
 	transactions := make([]core.Transaction, 0, len(mempoolTxs)+1)
 
-	// // Calculate mining fees
+	// Calculate mining fees
 	miningFees := 0
 	for _, tx := range mempoolTxs {
 		fee, err := m.Node.StateManager.CalculateFee(tx)
@@ -92,7 +93,11 @@ func (m *Miner) Mine(ctx context.Context) error {
 		miningFees += fee
 	}
 
-	coinbase := core.NewCoinbase(int64(DefaultMineReward), m.Node.StateManager.Wallet.PublicKey)
+	ownPubKeyHash, err := crypto.HashPublicKey(m.Node.StateManager.Wallet.PublicKey)
+	if err != nil {
+		return err
+	}
+	coinbase := core.NewCoinbase(int64(DefaultMineReward+miningFees), ownPubKeyHash)
 
 	transactions = append(transactions, *coinbase)
 
@@ -112,7 +117,10 @@ func (m *Miner) Mine(ctx context.Context) error {
 	}
 	log.Println("miner successfully mined block")
 
-	m.Node.StateManager.Update(block)
+	err = m.Node.StateManager.Update(block)
+	if err != nil {
+		return err
+	}
 
 	m.Node.Mempool.Clear(block)
 	m.Node.BroadcastInv(block.GetHash(), p2p.InvTypeBlock)

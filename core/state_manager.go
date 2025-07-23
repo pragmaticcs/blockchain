@@ -20,8 +20,6 @@ type StateManager struct {
 	// Copy of pointer to store to handle closing
 	Store Store
 
-	miningDifficulty uint32
-
 	// Mutexes
 	lock sync.RWMutex // Use when modifying the state of blockchain itself
 }
@@ -33,12 +31,11 @@ func NewStateManager(b *Blockchain, w *wallet.Wallet) (*StateManager, error) {
 		return nil, err
 	}
 	return &StateManager{
-		Blockchain:       b,
-		Wallet:           w,
-		UtxoSet:          utxoSet,
-		Store:            b.Store,
-		miningDifficulty: DefaultDifficulty,
-		lock:             sync.RWMutex{},
+		Blockchain: b,
+		Wallet:     w,
+		UtxoSet:    utxoSet,
+		Store:      b.Store,
+		lock:       sync.RWMutex{},
 	}, nil
 }
 
@@ -105,14 +102,14 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*Tran
 		Outputs: outputs,
 		Inputs:  inputs,
 	}
-	txID := tx.GetHash()
-	tx.ID = txID
 
 	err = s.Blockchain.SignTransaction(tx, s.Wallet.PrivateKey)
-
 	if err != nil {
 		return nil, err
 	}
+
+	tx.ID = tx.GetHash()
+
 	return tx, nil
 }
 

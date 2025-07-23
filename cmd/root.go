@@ -32,8 +32,9 @@ var sendAmount uint64
 var sendFee uint64
 
 func init() {
-	rootCmd.AddCommand(nodeCmd)
+	rootCmd.AddCommand(nodeCmd, walletCmd)
 	nodeCmd.AddCommand(nodeStartCmd, nodeStopCmd, nodeSendCmd)
+	walletCmd.AddCommand(walletGetAddress)
 
 	nodeStartCmd.Flags().BoolVar(&daemonMode, "daemon", false, "Run in daemon mode")
 	nodeStartCmd.Flags().MarkHidden("daemon")
@@ -50,7 +51,7 @@ func init() {
 
 var nodeCmd = &cobra.Command{
 	Use:   "node",
-	Short: "Manage the local blockchain node.",
+	Short: "Manage the local blockchain node",
 }
 
 var nodeStartCmd = &cobra.Command{
@@ -68,5 +69,16 @@ var nodeStopCmd = &cobra.Command{
 var nodeSendCmd = &cobra.Command{
 	Use:   "send",
 	Short: "Sends [amount] from nodes wallet to given [address]",
-	Run:   HandleStopNode,
+	Run:   HandleSend,
+}
+
+var walletCmd = &cobra.Command{
+	Use:   "wallet",
+	Short: "Manage your blockchain wallet",
+}
+
+var walletGetAddress = &cobra.Command{
+	Use:   "address",
+	Short: "Returns address of the wallet",
+	Run:   HandleGetAddress,
 }

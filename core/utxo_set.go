@@ -87,6 +87,7 @@ func (u *UTXOset) Update(block *Block) error {
 			spentOutputs = append(spentOutputs, outPoint)
 		}
 	}
+
 	return u.Store.PutDeleteUTXOs(newOutputs, spentOutputs)
 }
 

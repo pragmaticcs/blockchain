@@ -108,10 +108,7 @@ func (s *IpcServer) handleRequest(req *IpcRequest) *IpcResponse {
 			Data:    balance,
 		}
 	case IpcStopNode:
-		go func() {
-			// time.Sleep(time.Second)
-			s.node.sendQuitSignal()
-		}()
+		defer s.node.sendQuitSignal()
 		return &IpcResponse{
 			Success: true,
 			Data:    "node shutting down.",

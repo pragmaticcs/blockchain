@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pragmaticcs/blockchain/node"
+	"github.com/pragmaticcs/blockchain/wallet"
 	"github.com/spf13/cobra"
 )
 
@@ -47,14 +48,14 @@ func HandleSpawnNodeDaemon(cmd *cobra.Command, args []string) {
 
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
-		log.Fatalf("Failed to open log file: %v", err)
+		log.Fatalf("Failed to open log file: %s\n", err)
 	}
 
 	command.Stdout = file
 	command.Stderr = file
 
 	if err := command.Start(); err != nil {
-		log.Fatalf("Failed to start node daemon: %v", err)
+		log.Fatalf("Failed to start node daemon: %s\n", err)
 	}
 
 	fmt.Printf("Node started as background process with PID: %d\n", command.Process.Pid)
@@ -102,11 +103,21 @@ func HandleSend(cmd *cobra.Command, args []string) {
 	fmt.Printf("response from node: %v\n", resp.Data)
 }
 
+func HandleGetAddress(cmd *cobra.Command, args []string) {
+	wallet, err := wallet.LoadWalletFromFile(dataDir, walletName)
+	if err != nil {
+		fmt.Printf("error while loading wallet: %s\n", err)
+		return
+	}
+	addr, _ := wallet.GetAddress()
+	fmt.Printf("wallet address: %s\n", addr)
+}
+
 func SendIpcRequest(command node.IpcCommand, payload any) (*node.IpcResponse, error) {
 	socketPath := fmt.Sprintf("%s/gochain.sock", dataDir)
 	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
 	if err != nil {
-		log.Printf("error connecting to node daemon at path %s", socketPath)
+		log.Printf("error connecting to node daemon at path %s\n", socketPath)
 	}
 	defer conn.Close()
 
