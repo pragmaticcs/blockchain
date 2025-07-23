@@ -32,7 +32,7 @@ func HandleStartNodeDaemon(cmd *cobra.Command, args []string) {
 
 	err = node.Start()
 	if err != nil {
-		log.Fatalf("Node failed to start: %v", err)
+		log.Printf("node exited with error: %s", err)
 	}
 	select {}
 }
@@ -80,6 +80,25 @@ func HandleStopNode(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	fmt.Printf("response from node: %v\n", resp.Data)
+}
+
+func HandleSend(cmd *cobra.Command, args []string) {
+	payload := node.IpcPayloadSend{
+		Address: sendAddress,
+		Amount:  sendAmount,
+		Fee:     sendFee,
+	}
+	resp, err := SendIpcRequest(node.IpcSend, payload)
+	if err != nil {
+		fmt.Printf("error: %s\n", err)
+		return
+	}
+
+	if !resp.Success {
+		fmt.Printf("node ipc server returned an error: %s\n", resp.Error)
+		return
+	}
 	fmt.Printf("response from node: %v\n", resp.Data)
 }
 

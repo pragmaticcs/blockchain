@@ -146,14 +146,19 @@ func (n *Node) Start() error {
 
 func (n *Node) Stop() {
 	// Handles graceful shutdown
-	log.Panicln("stopping and clearing resources")
-	n.sendQuitSignal()
-	n.IpcServer.Stop()
+	log.Println("clearing resources")
 	close(n.quitCh)
 	close(n.rpcCh)
 	n.ticker.Stop()
-	_ = n.Transport.Close()
-	_ = n.StateManager.Close()
+	err := n.StateManager.Close()
+	if err != nil {
+		log.Println(err)
+	}
+	err = n.Transport.Close()
+	if err != nil {
+		log.Println(err)
+	}
+	n.IpcServer.sendQuitCh()
 }
 
 func (n *Node) sendQuitSignal() {
@@ -178,6 +183,7 @@ func (n *Node) MainLoop() {
 			go n.HandlePeriodicTasks()
 		case <-n.quitCh:
 			log.Println("MainLoop: received quit signal, shutting down.")
+			n.Stop()
 			return
 		}
 	}

@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"os"
+
+	"github.com/pragmaticcs/blockchain/wallet"
 )
 
 type IpcCommand string
@@ -13,6 +15,7 @@ type IpcCommand string
 const (
 	IpcGetBalance IpcCommand = "get_balance"
 	IpcStopNode   IpcCommand = "stop_node"
+	IpcSend       IpcCommand = "send"
 )
 
 type IpcRequest struct {
@@ -30,6 +33,7 @@ type IpcServer struct {
 	node       *Node
 	listener   net.Listener
 	socketPath string
+	quitCh     chan struct{}
 }
 
 func NewIpcServer(path string, node *Node) (*IpcServer, error) {
@@ -51,17 +55,24 @@ func NewIpcServer(path string, node *Node) (*IpcServer, error) {
 		node:       node,
 		listener:   listener,
 		socketPath: socketPath,
+		quitCh:     make(chan struct{}),
 	}, nil
 }
 
 func (s *IpcServer) Start() {
 	for {
-		conn, err := s.listener.Accept()
+		select {
+		case <-s.quitCh:
+			s.Stop()
+			return
+		default:
+			conn, err := s.listener.Accept()
 
-		if err != nil {
-			log.Panicf("ipc server: error during accept: %s", err)
+			if err != nil {
+				log.Panicf("ipc server: error during accept: %s", err)
+			}
+			go s.HandleConn(conn)
 		}
-		go s.HandleConn(conn)
 	}
 }
 
@@ -97,11 +108,33 @@ func (s *IpcServer) handleRequest(req *IpcRequest) *IpcResponse {
 			Data:    balance,
 		}
 	case IpcStopNode:
-		go s.node.sendQuitSignal()
-		s.node.Stop()
+		go func() {
+			// time.Sleep(time.Second)
+			s.node.sendQuitSignal()
+		}()
 		return &IpcResponse{
 			Success: true,
 			Data:    "node shutting down.",
+		}
+	case IpcSend:
+		var payload IpcPayloadSend
+		err := json.Unmarshal(req.Payload, &payload)
+		if err != nil {
+			return &IpcResponse{
+				Success: false,
+				Error:   "couldn't parse payload",
+			}
+		}
+		err = s.node.Send(wallet.Address(payload.Address), int(payload.Amount), int(payload.Fee))
+		if err != nil {
+			return &IpcResponse{
+				Success: false,
+				Error:   fmt.Sprintf("couln't execute transaction: %s", err),
+			}
+		}
+		return &IpcResponse{
+			Success: true,
+			Data:    "successful transaction broadcast",
 		}
 	default:
 		return &IpcResponse{
@@ -111,6 +144,16 @@ func (s *IpcServer) handleRequest(req *IpcRequest) *IpcResponse {
 	}
 }
 
+func (s *IpcServer) sendQuitCh() {
+	s.quitCh <- struct{}{}
+}
+
 func (s *IpcServer) Stop() {
 	s.listener.Close()
+}
+
+type IpcPayloadSend struct {
+	Address string `json:"address"`
+	Amount  uint64 `json:"amount"`
+	Fee     uint64 `json:"fee"`
 }

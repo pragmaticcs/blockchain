@@ -27,14 +27,21 @@ var dataDir string
 var walletName string
 var listenAddr string
 var seedPeers []string
+var sendAddress string
+var sendAmount uint64
+var sendFee uint64
 
 func init() {
 	rootCmd.AddCommand(nodeCmd)
-	nodeCmd.AddCommand(nodeStartCmd, nodeStopCmd)
+	nodeCmd.AddCommand(nodeStartCmd, nodeStopCmd, nodeSendCmd)
 
 	nodeStartCmd.Flags().BoolVar(&daemonMode, "daemon", false, "Run in daemon mode")
 	nodeStartCmd.Flags().MarkHidden("daemon")
 	nodeStartCmd.Flags().StringVar(&listenAddr, "listenAddr", "localhost:3000", "Address to listen on")
+
+	nodeSendCmd.Flags().Uint64Var(&sendAmount, "amount", 0, "Amount of coins to send to address")
+	nodeSendCmd.Flags().Uint64Var(&sendFee, "fee", 0, "Mining fee amount")
+	nodeSendCmd.Flags().StringVar(&sendAddress, "address", "", "Address of the reciever")
 
 	rootCmd.PersistentFlags().StringVar(&dataDir, "dataDir", "./", "Data directory containing wallet.json, genesis.data, database and logs")
 	rootCmd.PersistentFlags().StringVar(&walletName, "walletName", "john", "Wallet name (e.g. [walletName]_wallet.json)")
@@ -55,5 +62,11 @@ var nodeStartCmd = &cobra.Command{
 var nodeStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stops the local blockchain node",
+	Run:   HandleStopNode,
+}
+
+var nodeSendCmd = &cobra.Command{
+	Use:   "send",
+	Short: "Sends [amount] from nodes wallet to given [address]",
 	Run:   HandleStopNode,
 }
