@@ -7,6 +7,8 @@ const (
 	// For peer discovery and connections
 	RpcCommandVersion RpcCommand = iota
 	PrcCommandVerack
+	RpcCommandPing
+	RpcCommandPong
 	RpcCommandAddr    // Msg containing addresses of peers
 	RpcCommandGetAddr // Msg requesting addressess of peers
 

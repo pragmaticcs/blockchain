@@ -13,3 +13,5 @@ type Peer interface {
 }
 
 type HandshakeFunc func(Peer) error
+
+type PeerDisconnectFunc func(Peer)

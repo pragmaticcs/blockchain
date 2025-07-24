@@ -183,3 +183,8 @@ func (p *PeerManager) RewardPeer(reward int, peerAddr string) {
 	}
 	state.Score += reward
 }
+
+func (p *PeerManager) PeerDisconnectFunc(peer p2p.Peer) {
+	log.Printf("removing peer %s\n", peer.GetAddr())
+	p.RemovePeer(peer)
+}

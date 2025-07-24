@@ -104,6 +104,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		ListenAddr: opts.Port,
 		SeedPeers:  opts.SeedNodes,
 		Handshake:  node.Handshake,
+		Disconnect: node.PeerManager.PeerDisconnectFunc,
 	}
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
@@ -195,10 +196,10 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 		return n.HandleRpcInv(rpc)
 	case p2p.RpcCommandBlock:
 		return n.HandleRpcBlock(rpc)
-	// case p2p.RpcCommandAddr:
-	// return n.HandleRpcAddr(rpc)
-	// case p2p.RpcCommandGetAddr:
-	// return n.HandleRpcGetAddr(rpc)
+	case p2p.RpcCommandAddr:
+		return n.HandleRpcAddr(rpc)
+	case p2p.RpcCommandGetAddr:
+		return n.HandleRpcGetAddr(rpc)
 	case p2p.RpcCommandTx:
 		return n.HandleRpcTx(rpc)
 	case p2p.RpcCommandGetBlocks:
@@ -261,7 +262,7 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 	}
 
 	n.PeerManager.FinishHandshake(peer, theirMsgVersion.LatestBlockHeight)
-	// n.RequestAddr(peer)
+	n.RequestAddr(peer)
 
 	if theirMsgVersion.LatestBlockHeight > n.StateManager.GetLatestBlockHeight() {
 		n.sendSyncSignal()

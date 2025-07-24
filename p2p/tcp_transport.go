@@ -12,6 +12,8 @@ var NopHandshakeFunc HandshakeFunc = func(p Peer) error {
 	return nil
 }
 
+var NopPeerDisconnectFunc PeerDisconnectFunc = func(p Peer) {}
+
 type TCPPeer struct {
 	// Implements the Peer interface
 	net.Conn
@@ -36,6 +38,7 @@ type TCPTransportOpts struct {
 	ListenAddr string
 	SeedPeers  []string
 	Handshake  HandshakeFunc
+	Disconnect PeerDisconnectFunc
 }
 
 // Implements the Transport interface
@@ -130,6 +133,7 @@ func (t *TCPTransport) HandleConn(conn net.Conn) {
 	t.AddPeer(peer)
 
 	defer func() {
+		t.Disconnect(peer)
 		log.Printf("dropping peer: [%s]", peer.GetAddr())
 		t.RemovePeer(peer)
 		_ = peer.Close()
