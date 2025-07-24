@@ -208,6 +208,7 @@ func (s *SyncManager) processPendingBlocks() error {
 }
 
 func (s *SyncManager) finishSync() {
+	log.Println("finished syncing")
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.syncing = false

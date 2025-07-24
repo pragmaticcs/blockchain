@@ -9,12 +9,18 @@ import (
 
 type GenesisConfig struct {
 	Amount     int64
+	Time       int64
 	PubKeyHash []byte
 }
 
 func (g *GenesisConfig) ToFile(path string) error {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, g.Amount)
+	err := binary.Write(buf, binary.LittleEndian, g.Amount)
+	if err != nil {
+		return err
+	}
+
+	err = binary.Write(buf, binary.LittleEndian, g.Time)
 	if err != nil {
 		return err
 	}
@@ -37,7 +43,12 @@ func LoadGenesisConfig(path string) (*GenesisConfig, error) {
 	var genesis GenesisConfig
 	reader := bytes.NewReader(buf)
 
-	err = binary.Read(reader, binary.BigEndian, &genesis.Amount)
+	err = binary.Read(reader, binary.LittleEndian, &genesis.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(reader, binary.LittleEndian, &genesis.Time)
 	if err != nil {
 		return nil, err
 	}

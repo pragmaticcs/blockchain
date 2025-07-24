@@ -11,6 +11,7 @@ func main() {
 	// geneis := core.GenesisConfig{
 	// 	Amount:     500,
 	// 	PubKeyHash: pubKeyHash,
+	// 	Time:       time.Now().Unix(),
 	// }
 	// geneis.ToFile("./")
 	cmd.Execute()

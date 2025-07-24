@@ -47,8 +47,9 @@ func (s *StateManager) GetLatestBlockHeight() uint32 {
 }
 
 func (s *StateManager) GetBlockchainHead() BlockHash {
-	block, _ := s.Blockchain.Store.GetBlockchainHead()
-	return block.GetHash()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.Blockchain.Head
 }
 
 func (s *StateManager) GetBalance() (int, error) {
@@ -99,7 +100,8 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*Tran
 		Inputs:  inputs,
 	}
 
-	tx.ID = tx.GetHash()
+	txID := tx.GetHash()
+	tx.ID = txID
 
 	err = s.Blockchain.SignTransaction(tx, s.Wallet.PrivateKey)
 	if err != nil {

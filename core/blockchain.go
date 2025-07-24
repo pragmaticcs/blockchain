@@ -1,5 +1,10 @@
 package core
 
+import (
+	"encoding/hex"
+	"log"
+)
+
 type Blockchain struct {
 	Store      Store
 	Head       BlockHash
@@ -28,7 +33,7 @@ func InitBlockchain(store Store, genesisConfDir string) (*Blockchain, error) {
 }
 
 func NewBlockchain(genesisConfig GenesisConfig, store Store) (*Blockchain, error) {
-	genesis, err := CreateGenesisBlock(genesisConfig.Amount, genesisConfig.PubKeyHash)
+	genesis, err := CreateGenesisBlock(genesisConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -40,6 +45,7 @@ func NewBlockchain(genesisConfig GenesisConfig, store Store) (*Blockchain, error
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("fn <NewBlockchain> Blockchain head %s", hex.EncodeToString(genesis.GetHash()))
 	return &Blockchain{
 		Store:      store,
 		Head:       genesis.GetHash(),

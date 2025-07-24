@@ -91,7 +91,25 @@ func GetHexValue(i int64) []byte {
 	return buf.Bytes()
 }
 
-func CreateGenesisBlock(value int64, pubKeyHash []byte) (*Block, error) {
-	coinbase := NewCoinbase(value, pubKeyHash)
-	return NewBlock([]byte{}, []Transaction{*coinbase}, 0)
+func CreateGenesisBlock(conf GenesisConfig) (*Block, error) {
+	coinbase := NewCoinbase(conf.Amount, conf.PubKeyHash)
+	blockBody := BlockBody{
+		Transactions: []Transaction{*coinbase},
+	}
+	merkleTree, err := blockBody.GetMerkleTree()
+	if err != nil {
+		return nil, err
+	}
+	return &Block{
+		BlockHeader: BlockHeader{
+			Version:    CurrentVersion,
+			PrevHash:   []byte{},
+			MerkleRoot: merkleTree.Root,
+			Time:       conf.Time,
+			Nonce:      0,
+			Difficulty: 0,
+			Height:     0,
+		},
+		BlockBody: blockBody,
+	}, nil
 }
