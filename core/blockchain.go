@@ -32,8 +32,14 @@ func NewBlockchain(genesisConfig GenesisConfig, store Store) (*Blockchain, error
 	if err != nil {
 		return nil, err
 	}
-	store.PutBlock(genesis)
-	store.SetBlockchainHead(genesis)
+	err = store.PutBlock(genesis)
+	if err != nil {
+		return nil, err
+	}
+	err = store.SetBlockchainHead(genesis)
+	if err != nil {
+		return nil, err
+	}
 	return &Blockchain{
 		Store:      store,
 		Head:       genesis.GetHash(),
@@ -69,4 +75,12 @@ func (b *Blockchain) AddBlock(block *Block) error {
 		return err
 	}
 	return b.Store.SetBlockchainHead(block)
+}
+
+func (b *Blockchain) Close() error {
+	return b.Store.Close()
+}
+
+func (s *Blockchain) GetBlock(hash BlockHash) (*Block, error) {
+	return s.Store.GetBlock(hash)
 }

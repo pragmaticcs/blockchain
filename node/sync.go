@@ -208,6 +208,8 @@ func (s *SyncManager) processPendingBlocks() error {
 }
 
 func (s *SyncManager) finishSync() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.syncing = false
 	s.invPeer = nil
 }

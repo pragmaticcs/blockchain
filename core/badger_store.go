@@ -28,7 +28,7 @@ func (b BadgerPrefix) DeconstructKey(key []byte) []byte {
 var (
 	blockPrefix       = NewBadgerPrefix([]byte("block-"))
 	utxoPrefix        = NewBadgerPrefix([]byte("utxo-"))
-	blockchainHeadKey = []byte("blockchainhead")
+	blockchainHeadKey = []byte("blockchainhead-")
 )
 
 type BadgerStore struct {

@@ -195,10 +195,10 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 		return n.HandleRpcInv(rpc)
 	case p2p.RpcCommandBlock:
 		return n.HandleRpcBlock(rpc)
-	case p2p.RpcCommandAddr:
-		return n.HandleRpcAddr(rpc)
-	case p2p.RpcCommandGetAddr:
-		return n.HandleRpcGetAddr(rpc)
+	// case p2p.RpcCommandAddr:
+	// return n.HandleRpcAddr(rpc)
+	// case p2p.RpcCommandGetAddr:
+	// return n.HandleRpcGetAddr(rpc)
 	case p2p.RpcCommandTx:
 		return n.HandleRpcTx(rpc)
 	case p2p.RpcCommandGetBlocks:
@@ -261,7 +261,7 @@ func (n *Node) Handshake(peer p2p.Peer) error {
 	}
 
 	n.PeerManager.FinishHandshake(peer, theirMsgVersion.LatestBlockHeight)
-	n.RequestAddr(peer)
+	// n.RequestAddr(peer)
 
 	if theirMsgVersion.LatestBlockHeight > n.StateManager.GetLatestBlockHeight() {
 		n.sendSyncSignal()
@@ -355,7 +355,7 @@ func (n *Node) itemExists(item p2p.InvVector) bool {
 	// TODO: query items more efficiently, not one by one
 	switch item.Type {
 	case p2p.InvTypeBlock:
-		return n.StateManager.BlockExists(item.Hash)
+		return n.StateManager.Blockchain.Store.Exists(item.Hash)
 	case p2p.InvTypeTx:
 		return n.Mempool.TxExists(item.Hash)
 	}
@@ -389,6 +389,7 @@ func (n *Node) HandleGetDataTx(item p2p.InvVector, addr string) error {
 
 	if !ok {
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
+		log.Printf("fn <HandleGetDataTx> requested block %s not found\n", hex.EncodeToString(item.Hash))
 		return n.PeerManager.SendMessage(addr, messageNotFound)
 	}
 
@@ -404,12 +405,13 @@ func (n *Node) HandleGetDataTx(item p2p.InvVector, addr string) error {
 }
 
 func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
-	if !n.StateManager.BlockExists(item.Hash) {
+	if !n.StateManager.Blockchain.Store.Exists(item.Hash) {
+		log.Printf("fn <HandleGetDataBlock> requested block %s not found\n", hex.EncodeToString(item.Hash))
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
 		return n.PeerManager.SendMessage(addr, messageNotFound)
 	}
 
-	block, err := n.StateManager.GetBlock(item.Hash)
+	block, err := n.StateManager.Blockchain.GetBlock(item.Hash)
 	if err != nil {
 		return err
 	}
@@ -500,6 +502,7 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 		return err
 	}
 	if !n.StateManager.Blockchain.Store.Exists(msgGetBlocks.From) {
+		log.Printf("fn <HandleRpcGetBlocks> Requested block %s not found\n", hex.EncodeToString(msgGetBlocks.From))
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
 		return n.PeerManager.SendMessage(rpc.From, messageNotFound)
 	}

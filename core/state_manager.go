@@ -17,8 +17,6 @@ type StateManager struct {
 	Blockchain *Blockchain
 	UtxoSet    *UTXOset
 	Wallet     *wallet.Wallet
-	// Copy of pointer to store to handle closing
-	Store Store
 
 	// Mutexes
 	lock sync.RWMutex // Use when modifying the state of blockchain itself
@@ -34,13 +32,12 @@ func NewStateManager(b *Blockchain, w *wallet.Wallet) (*StateManager, error) {
 		Blockchain: b,
 		Wallet:     w,
 		UtxoSet:    utxoSet,
-		Store:      b.Store,
 		lock:       sync.RWMutex{},
 	}, nil
 }
 
 func (s *StateManager) Close() error {
-	return s.Store.Close()
+	return s.Blockchain.Close()
 }
 
 func (s *StateManager) GetLatestBlockHeight() uint32 {
@@ -50,9 +47,8 @@ func (s *StateManager) GetLatestBlockHeight() uint32 {
 }
 
 func (s *StateManager) GetBlockchainHead() BlockHash {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.Blockchain.Head
+	block, _ := s.Blockchain.Store.GetBlockchainHead()
+	return block.GetHash()
 }
 
 func (s *StateManager) GetBalance() (int, error) {
@@ -103,26 +99,14 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*Tran
 		Inputs:  inputs,
 	}
 
+	tx.ID = tx.GetHash()
+
 	err = s.Blockchain.SignTransaction(tx, s.Wallet.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	tx.ID = tx.GetHash()
-
 	return tx, nil
-}
-
-func (s *StateManager) BlockExists(hash BlockHash) bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.Store.Exists(hash)
-}
-
-func (s *StateManager) GetBlock(hash BlockHash) (*Block, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.Store.GetBlock(hash)
 }
 
 func (s *StateManager) Update(block *Block) error {
