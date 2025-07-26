@@ -24,6 +24,7 @@ var (
 // job in the mainloop of the node
 const MaxWorkers int = 8
 const DefaultMineReward = 5
+const PeriodicTaskFreq = 5
 
 type PeriodicTask func() error
 
@@ -89,7 +90,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		StateManager:     stateManager,
 		Mempool:          NewMempool(),
 		Transport:        nil,
-		PeerManager:      NewPeerManager(),
+		PeerManager:      nil,
 		SyncManager:      nil,
 		Miner:            nil,
 		IpcServer:        nil,
@@ -98,14 +99,14 @@ func NewNode(opts NodeOpts) (*Node, error) {
 		rpcCh:            make(chan p2p.RPC, 100),
 		quitCh:           make(chan struct{}),
 		syncCh:           make(chan struct{}),
-		ticker:           time.NewTicker(5 * time.Second),
+		ticker:           time.NewTicker(PeriodicTaskFreq * time.Second),
 	}
 	transportOpts := p2p.TCPTransportOpts{
 		ListenAddr: opts.Port,
 		SeedPeers:  opts.SeedNodes,
 		Handshake:  node.Handshake,
-		Disconnect: node.PeerManager.PeerDisconnectFunc,
 	}
+	node.PeerManager = NewPeerManager(node)
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
 	node.Miner = NewMiner(node)
@@ -208,6 +209,10 @@ func (n *Node) HandleRpc(rpc p2p.RPC) error {
 		return n.HandleRpcGetData(rpc)
 	case p2p.RpcCommandNotFound:
 		return n.HandleRpcNotFound(rpc)
+	case p2p.RpcCommandPing:
+		return n.HandleRpcPing(rpc)
+	case p2p.RpcCommandPong:
+		return n.HandleRpcPong(rpc)
 	default:
 		return nil
 	}
@@ -276,6 +281,10 @@ func (n *Node) HandlePeriodicTasks() error {
 	log.Printf("connected to %d peers", len(peers))
 	balance, _ := n.StateManager.GetBalance()
 	log.Printf("current balance = %d", balance)
+
+	n.PeerManager.PingPeers()
+	n.PeerManager.TrimPeers()
+
 	return nil
 }
 
@@ -528,6 +537,17 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 	}
 	msg := p2p.NewMessage(payload, p2p.RpcCommandInv)
 	return n.PeerManager.SendMessage(rpc.From, msg)
+}
+
+func (n *Node) HandleRpcPing(rpc p2p.RPC) error {
+	n.PeerManager.MarkSeenOnline(rpc.From)
+	msgPong := p2p.NewMessage(nil, p2p.RpcCommandPong)
+	return n.PeerManager.SendMessage(rpc.From, msgPong)
+}
+
+func (n *Node) HandleRpcPong(rpc p2p.RPC) error {
+	n.PeerManager.MarkSeenOnline(rpc.From)
+	return nil
 }
 
 func (n *Node) BroadcastInv(hash []byte, invType p2p.InvType) {

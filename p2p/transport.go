@@ -10,8 +10,7 @@ type Peer interface {
 	io.ReadWriter
 	Send([]byte) error
 	GetAddr() string
+	Close() error
 }
 
 type HandshakeFunc func(Peer) error
-
-type PeerDisconnectFunc func(Peer)

@@ -9,6 +9,8 @@ import (
 	"github.com/pragmaticcs/blockchain/p2p"
 )
 
+const PeerTimeout time.Duration = 10 * time.Second
+
 type PeerStatus uint8
 
 const (
@@ -26,12 +28,14 @@ type PeerState struct {
 }
 
 type PeerManager struct {
+	node  *Node
 	peers map[string]*PeerState
 	lock  sync.RWMutex
 }
 
-func NewPeerManager() *PeerManager {
+func NewPeerManager(node *Node) *PeerManager {
 	return &PeerManager{
+		node:  node,
 		peers: make(map[string]*PeerState),
 		lock:  sync.RWMutex{},
 	}
@@ -95,6 +99,9 @@ func (p *PeerManager) Broadcast(msg *p2p.Message) {
 }
 
 func (p *PeerManager) RemovePeer(peer p2p.Peer) {
+	if peer == nil {
+		return
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -163,8 +170,8 @@ func (p *PeerManager) FindSyncPeer(ownHeight uint32) (p2p.Peer, bool) {
 }
 
 func (p *PeerManager) PenalizePeer(penalty int, peerAddr string) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	state, ok := p.getPeerUnlocked(peerAddr)
 	if !ok {
@@ -174,14 +181,64 @@ func (p *PeerManager) PenalizePeer(penalty int, peerAddr string) {
 }
 
 func (p *PeerManager) RewardPeer(reward int, peerAddr string) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	state, ok := p.getPeerUnlocked(peerAddr)
 	if !ok {
 		return
 	}
 	state.Score += reward
+}
+
+func (p *PeerManager) FindUnresponsivePeers() []p2p.Peer {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	var unsresponsivePeers []p2p.Peer
+
+	for _, state := range p.peers {
+		if state.PeerStatus == PeerStatusConnected &&
+			state.LastSeenOnline.Add(PeerTimeout).Before(time.Now()) {
+			unsresponsivePeers = append(unsresponsivePeers, state.peer)
+		}
+	}
+	return unsresponsivePeers
+}
+
+func (p *PeerManager) PingPeers() {
+	peersToPing := p.GetBroadcastCandidates()
+	msg := p2p.NewMessage(nil, p2p.RpcCommandPing)
+
+	for _, peer := range peersToPing {
+		err := p.SendMessage(peer.GetAddr(), msg)
+		if err != nil {
+			log.Printf("failed to send ping to %s: %s", peer.GetAddr(), err)
+		}
+	}
+}
+
+func (p *PeerManager) TrimPeers() {
+	unsresponsivePeers := p.FindUnresponsivePeers()
+	for _, peer := range unsresponsivePeers {
+		log.Printf("trimming unresponsive peer: %s", peer.GetAddr())
+		p.DisconnectPeer(peer)
+	}
+}
+
+func (p *PeerManager) DisconnectPeer(peer p2p.Peer) {
+	p.RemovePeer(peer)
+	_ = peer.Close()
+}
+
+func (p *PeerManager) MarkSeenOnline(addr string) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	state, ok := p.getPeerUnlocked(addr)
+	if !ok {
+		return
+	}
+	state.LastSeenOnline = time.Now()
 }
 
 func (p *PeerManager) PeerDisconnectFunc(peer p2p.Peer) {
