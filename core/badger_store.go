@@ -33,9 +33,7 @@ var (
 
 type BadgerStore struct {
 	// Implements Store interface
-	DB                  *badger.DB
-	BlockEncoderDecoder BlockEncoderDecoder
-	UtxoEncoderDecoder  UtxoEncoderDecoder
+	DB *badger.DB
 }
 
 func NewBadgerStore(path string) (*BadgerStore, error) {
@@ -45,9 +43,7 @@ func NewBadgerStore(path string) (*BadgerStore, error) {
 		return nil, err
 	}
 	return &BadgerStore{
-		DB:                  db,
-		BlockEncoderDecoder: utils.GobEncoderDecoder[Block]{},
-		UtxoEncoderDecoder:  utils.GobEncoderDecoder[TxOutput]{},
+		DB: db,
 	}, nil
 }
 
@@ -78,11 +74,11 @@ func (b *BadgerStore) GetBlock(hash BlockHash) (*Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.BlockEncoderDecoder.Decode(value)
+	return utils.DecodeInGob[Block](value)
 }
 
 func (b *BadgerStore) PutBlock(block *Block) error {
-	value, err := b.BlockEncoderDecoder.Encode(block)
+	value, err := utils.EncodeInGob(block)
 	if err != nil {
 		return err
 	}
@@ -108,11 +104,11 @@ func (b *BadgerStore) GetBlockchainHead() (*Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.BlockEncoderDecoder.Decode(value)
+	return utils.DecodeInGob[Block](value)
 }
 
 func (b *BadgerStore) SetBlockchainHead(block *Block) error {
-	value, err := b.BlockEncoderDecoder.Encode(block)
+	value, err := utils.EncodeInGob(block)
 	if err != nil {
 		return err
 	}
@@ -137,7 +133,7 @@ func (b *BadgerStore) PutUTXOs(utxos UTXOs) error {
 				return err
 			}
 			key = utxoPrefix.ConstructKey(key)
-			value, err := b.UtxoEncoderDecoder.Encode(&utxo)
+			value, err := utils.EncodeInGob(&utxo)
 			if err != nil {
 				return err
 			}
@@ -188,7 +184,7 @@ func (b *BadgerStore) GetUTXO(outpoint OutPoint) (*TxOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	return b.UtxoEncoderDecoder.Decode(value)
+	return utils.DecodeInGob[TxOutput](value)
 }
 
 func (b *BadgerStore) PutDeleteUTXOs(put UTXOs, delete []OutPoint) error {
@@ -201,7 +197,7 @@ func (b *BadgerStore) PutDeleteUTXOs(put UTXOs, delete []OutPoint) error {
 				return err
 			}
 			key = utxoPrefix.ConstructKey(key)
-			value, err := b.UtxoEncoderDecoder.Encode(&utxo)
+			value, err := utils.EncodeInGob(&utxo)
 			if err != nil {
 				return err
 			}
@@ -246,7 +242,7 @@ func (b *BadgerStore) ForEachUTXO(fn func(outPoint OutPoint, out TxOutput) error
 
 			var utxo *TxOutput
 			err = item.Value(func(val []byte) error {
-				value, err := b.UtxoEncoderDecoder.Decode(val)
+				value, err := utils.DecodeInGob[TxOutput](val)
 				if err != nil {
 					return err
 				}

@@ -11,7 +11,6 @@ var rootCmd = &cobra.Command{
 	Use:   "gochain",
 	Short: "A simple blockchain implementation in pure Golang",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Do Stuff Here
 	},
 }
 
@@ -24,6 +23,7 @@ func Execute() {
 
 var daemonMode bool
 var dataDir string
+var walletDir string
 var walletName string
 var listenAddr string
 var seedPeers []string
@@ -32,21 +32,30 @@ var sendAmount uint64
 var sendFee uint64
 
 func init() {
+	// Root command
 	rootCmd.AddCommand(nodeCmd, walletCmd)
-	nodeCmd.AddCommand(nodeStartCmd, nodeStopCmd, nodeSendCmd)
-	walletCmd.AddCommand(walletGetAddress)
 
+	// Node command
+	nodeCmd.AddCommand(nodeStartCmd, nodeStopCmd, nodeSendCmd)
+	nodeCmd.PersistentFlags().StringVar(&dataDir, "dataDir", "./", "Data directory containing genesis.data, database and logs")
+
+	// Node start command
 	nodeStartCmd.Flags().BoolVar(&daemonMode, "daemon", false, "Run in daemon mode")
 	nodeStartCmd.Flags().MarkHidden("daemon")
-	nodeStartCmd.Flags().StringVar(&listenAddr, "listenAddr", "localhost:3000", "Address to listen on")
+	nodeStartCmd.Flags().StringVar(&listenAddr, "listenAddr", ":3000", "Address to listen on")
+	nodeStartCmd.Flags().StringVar(&walletName, "walletName", "", "Name of the wallet [name]_wallet.json the node will use")
+	nodeStartCmd.Flags().StringVar(&walletDir, "walletDir", "", "Directory in which the wallet is stored")
+	nodeStartCmd.Flags().StringSliceVar(&seedPeers, "seedPeers", nil, "Comma-separated list of seed peer addresses to connect to")
 
+	// Node send command
 	nodeSendCmd.Flags().Uint64Var(&sendAmount, "amount", 0, "Amount of coins to send to address")
 	nodeSendCmd.Flags().Uint64Var(&sendFee, "fee", 0, "Mining fee amount")
 	nodeSendCmd.Flags().StringVar(&sendAddress, "address", "", "Address of the reciever")
 
-	rootCmd.PersistentFlags().StringVar(&dataDir, "dataDir", "./", "Data directory containing wallet.json, genesis.data, database and logs")
-	rootCmd.PersistentFlags().StringVar(&walletName, "walletName", "john", "Wallet name (e.g. [walletName]_wallet.json)")
-	rootCmd.PersistentFlags().StringSliceVar(&seedPeers, "seedPeers", nil, "Comma-separated list of seed peer addresses to connect to")
+	// Wallet command
+	walletCmd.AddCommand(walletGetAddress, walletNew)
+	walletCmd.PersistentFlags().StringVar(&walletName, "name", "my", "Name of the wallet [name]_wallet.json")
+	walletCmd.PersistentFlags().StringVar(&walletDir, "dir", "./", "Directory in which the wallet is stored")
 }
 
 var nodeCmd = &cobra.Command{
@@ -57,19 +66,19 @@ var nodeCmd = &cobra.Command{
 var nodeStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Starts the local blockchain node",
-	Run:   HandleStartNode,
+	Run:   HandleNodeStart,
 }
 
 var nodeStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stops the local blockchain node",
-	Run:   HandleStopNode,
+	Run:   HandleNodeStop,
 }
 
 var nodeSendCmd = &cobra.Command{
 	Use:   "send",
 	Short: "Sends [amount] from nodes wallet to given [address]",
-	Run:   HandleSend,
+	Run:   HandleNodeSend,
 }
 
 var walletCmd = &cobra.Command{
@@ -80,5 +89,11 @@ var walletCmd = &cobra.Command{
 var walletGetAddress = &cobra.Command{
 	Use:   "address",
 	Short: "Returns address of the wallet",
-	Run:   HandleGetAddress,
+	Run:   HandleWalletGetAddress,
+}
+
+var walletNew = &cobra.Command{
+	Use:   "new",
+	Short: "Creates a new wallet with [name] in a [directory]",
+	Run:   HandleWalletNew,
 }

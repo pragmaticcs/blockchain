@@ -61,7 +61,7 @@ func HandleSpawnNodeDaemon(cmd *cobra.Command, args []string) {
 	fmt.Printf("Node started as background process with PID: %d\n", command.Process.Pid)
 }
 
-func HandleStartNode(cmd *cobra.Command, args []string) {
+func HandleNodeStart(cmd *cobra.Command, args []string) {
 	if daemonMode {
 		HandleStartNodeDaemon(cmd, args)
 	} else {
@@ -69,7 +69,7 @@ func HandleStartNode(cmd *cobra.Command, args []string) {
 	}
 }
 
-func HandleStopNode(cmd *cobra.Command, args []string) {
+func HandleNodeStop(cmd *cobra.Command, args []string) {
 	resp, err := SendIpcRequest(node.IpcStopNode, nil)
 	if err != nil {
 		fmt.Printf("error: %s\n", err)
@@ -84,7 +84,7 @@ func HandleStopNode(cmd *cobra.Command, args []string) {
 	fmt.Printf("response from node: %v\n", resp.Data)
 }
 
-func HandleSend(cmd *cobra.Command, args []string) {
+func HandleNodeSend(cmd *cobra.Command, args []string) {
 	payload := node.IpcPayloadSend{
 		Address: sendAddress,
 		Amount:  sendAmount,
@@ -103,14 +103,27 @@ func HandleSend(cmd *cobra.Command, args []string) {
 	fmt.Printf("response from node: %v\n", resp.Data)
 }
 
-func HandleGetAddress(cmd *cobra.Command, args []string) {
-	wallet, err := wallet.LoadWalletFromFile(dataDir, walletName)
+func HandleWalletGetAddress(cmd *cobra.Command, args []string) {
+	wallet, err := wallet.LoadWalletFromFile(walletDir, walletName)
 	if err != nil {
 		fmt.Printf("error while loading wallet: %s\n", err)
 		return
 	}
 	addr, _ := wallet.GetAddress()
 	fmt.Printf("wallet address: %s\n", addr)
+}
+
+func HandleWalletNew(cmd *cobra.Command, args []string) {
+	wallet, err := wallet.NewWallet()
+	if err != nil {
+		fmt.Printf("error while creating a new wallet: %s\n", err)
+		return
+	}
+	err = wallet.SaveToFile(walletDir, walletName)
+	if err != nil {
+		fmt.Printf("error while saving created wallet to file: %s\n", err)
+		return
+	}
 }
 
 func SendIpcRequest(command node.IpcCommand, payload any) (*node.IpcResponse, error) {

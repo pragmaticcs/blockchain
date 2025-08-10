@@ -63,6 +63,7 @@ func (w *Wallet) GetAddress() (Address, error) {
 }
 
 func (w *Wallet) SaveToFile(dir, name string) error {
+	path := fmt.Sprintf("%s/%s_wallet.json", dir, name)
 	privateKeyBytes, err := x509.MarshalECPrivateKey(&w.PrivateKey)
 	if err != nil {
 		return err
@@ -86,7 +87,6 @@ func (w *Wallet) SaveToFile(dir, name string) error {
 	jsonEncoder := json.NewEncoder(buf)
 	jsonEncoder.Encode(jsonWallet)
 
-	path := fmt.Sprintf("%s/%s_wallet.json", dir, name)
 	return os.WriteFile(path, buf.Bytes(), 0600)
 }
 

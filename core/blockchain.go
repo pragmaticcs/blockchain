@@ -12,8 +12,6 @@ type Blockchain struct {
 }
 
 func InitBlockchain(store Store, genesisConfDir string) (*Blockchain, error) {
-	// TODO: Handle fetching the blockchain from the store
-	// and setting the CurrHeight
 	head, err := store.GetBlockchainHead()
 	if err != nil {
 		return nil, err
