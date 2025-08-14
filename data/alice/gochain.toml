@@ -1,0 +1,13 @@
+[node]
+
+[node.wallet]
+dir = './'
+name = 'alice'
+
+[node.server]
+port = ':3002'
+peers = [
+    ':3000',
+    ':3001'
+]
+

@@ -21,15 +21,17 @@ func Execute() {
 	}
 }
 
+// Node Command
 var daemonMode bool
 var dataDir string
-var walletDir string
-var walletName string
-var listenAddr string
-var seedPeers []string
+
 var sendAddress string
 var sendAmount uint64
 var sendFee uint64
+
+// Wallet Command
+var walletDir string
+var walletName string
 
 func init() {
 	// Root command
@@ -37,15 +39,11 @@ func init() {
 
 	// Node command
 	nodeCmd.AddCommand(nodeStartCmd, nodeStopCmd, nodeSendCmd)
-	nodeCmd.PersistentFlags().StringVar(&dataDir, "dataDir", "./", "Data directory containing genesis.data, database and logs")
+	nodeCmd.PersistentFlags().StringVar(&dataDir, "dataDir", "./", "Data directory containing config file, genesis.data, database and logs")
 
 	// Node start command
 	nodeStartCmd.Flags().BoolVar(&daemonMode, "daemon", false, "Run in daemon mode")
 	nodeStartCmd.Flags().MarkHidden("daemon")
-	nodeStartCmd.Flags().StringVar(&listenAddr, "listenAddr", ":3000", "Address to listen on")
-	nodeStartCmd.Flags().StringVar(&walletName, "walletName", "", "Name of the wallet [name]_wallet.json the node will use")
-	nodeStartCmd.Flags().StringVar(&walletDir, "walletDir", "", "Directory in which the wallet is stored")
-	nodeStartCmd.Flags().StringSliceVar(&seedPeers, "seedPeers", nil, "Comma-separated list of seed peer addresses to connect to")
 
 	// Node send command
 	nodeSendCmd.Flags().Uint64Var(&sendAmount, "amount", 0, "Amount of coins to send to address")

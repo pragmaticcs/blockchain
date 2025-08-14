@@ -1,0 +1,13 @@
+[node]
+
+[node.wallet]
+dir = './'
+name = 'bob'
+
+[node.server]
+port = ':3001'
+peers = [
+    ':3000',
+    ':3002'
+]
+

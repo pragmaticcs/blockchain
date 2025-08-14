@@ -11,21 +11,49 @@ import (
 
 	"github.com/pragmaticcs/blockchain/node"
 	"github.com/pragmaticcs/blockchain/wallet"
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 )
 
+type (
+	tomlConfig struct {
+		Node tomlNode `toml:"node"`
+	}
+	tomlNode struct {
+		Wallet tomlWallet `toml:"wallet"`
+		Server tomlServer `toml:"server"`
+	}
+	tomlWallet struct {
+		Dir  string `toml:"dir"`
+		Name string `toml:"name"`
+	}
+	tomlServer struct {
+		Port  string   `toml:"port"`
+		Peers []string `toml:"peers"`
+	}
+)
+
 func HandleStartNodeDaemon(cmd *cobra.Command, args []string) {
-	log.Println("Starting node daemon...")
+	configPath := fmt.Sprintf("%s/gochain.toml", dataDir)
+
+	var config tomlConfig
+
+	_, err := toml.DecodeFile(configPath, &config)
+	if err != nil {
+		log.Printf("Failed to parse config file: %v", err)
+	}
 
 	nodeOpts := node.NodeOpts{
-		Port:                  listenAddr,
-		SeedNodes:             seedPeers,
-		WalletName:            walletName,
-		WalletDir:             dataDir,
+		Port:                  config.Node.Server.Port,
+		SeedNodes:             config.Node.Server.Peers,
+		DataDir:               dataDir,
+		WalletName:            config.Node.Wallet.Name,
+		WalletDir:             fmt.Sprintf("%s/%s", dataDir, config.Node.Wallet.Dir),
 		BlockchainDatabaseDir: fmt.Sprintf("%s/db", dataDir),
 		GenesisConfigDir:      dataDir,
 	}
 
+	log.Println("Starting node daemon...")
 	node, err := node.NewNode(nodeOpts)
 	if err != nil {
 		log.Fatalf("Failed to create node: %v", err)

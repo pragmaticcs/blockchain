@@ -1,0 +1,13 @@
+[node]
+
+[node.wallet]
+dir = './'
+name = 'satoshi'
+
+[node.server]
+port = ':3000'
+peers = [
+    ':3001',
+    ':3002'
+]
+

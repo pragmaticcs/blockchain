@@ -33,6 +33,7 @@ type NodeOpts struct {
 	SeedNodes             []string
 	WalletDir             string
 	WalletName            string
+	DataDir               string
 	BlockchainDatabaseDir string
 	GenesisConfigDir      string
 }
@@ -110,7 +111,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
 	node.Miner = NewMiner(node)
-	ipcServer, err := NewIpcServer(opts.WalletDir, node)
+	ipcServer, err := NewIpcServer(opts.DataDir, node)
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
 	}
