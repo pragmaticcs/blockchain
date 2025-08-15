@@ -9,13 +9,11 @@ RUN go mod download
 
 COPY --exclude=data . ./ 
 
-RUN mkdir data
-
-RUN mkdir bin
+RUN mkdir data bin
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o bin/blockchain
 
-EXPOSE 8081
+EXPOSE 8080
 
 ARG DATA_DIR="data/satoshi"
 

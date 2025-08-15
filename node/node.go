@@ -36,7 +36,6 @@ type NodeOpts struct {
 	DataDir               string
 	BlockchainDatabaseDir string
 	GenesisConfigDir      string
-	WithIPCServer         bool
 }
 
 func DefaultNodeOpts() NodeOpts {
@@ -112,13 +111,11 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
 	node.Miner = NewMiner(node)
-	if opts.WithIPCServer {
-		ipcServer, err := NewIpcServer(opts.DataDir, node)
-		if err != nil {
-			return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
-		}
-		node.IpcServer = ipcServer
+	ipcServer, err := NewIpcServer(opts.DataDir, node)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
 	}
+	node.IpcServer = ipcServer
 	return node, err
 }
 
@@ -141,9 +138,7 @@ func (n *Node) rpcWorker() {
 func (n *Node) Start() error {
 	n.launchWorkerPool(MaxWorkers)
 	n.Miner.Start()
-	if n.IpcServer != nil {
-		go n.IpcServer.Start()
-	}
+	go n.IpcServer.Start()
 	go n.MainLoop()
 	err := n.Transport.ListenAndServe()
 	if err != nil {

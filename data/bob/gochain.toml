@@ -5,9 +5,9 @@ dir = './'
 name = 'bob'
 
 [node.server]
-port = ':8083'
+port = ':8080'
 peers = [
-    ':8081',
-    ':8082'
+    'alice:8080',
+    'satoshi:8080'
 ]
 
