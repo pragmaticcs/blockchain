@@ -21,5 +21,5 @@ ARG DATA_DIR="data/satoshi"
 
 COPY $DATA_DIR data
 
-CMD ./bin/blockchain --dataDir ./data node start --daemon false
+CMD ./bin/blockchain --dataDir ./data node start --daemon
 

@@ -3,6 +3,5 @@ makefile
 README.md
 
 bin/
-db/
 *.log
 *.sock

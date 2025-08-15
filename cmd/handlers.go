@@ -63,6 +63,7 @@ func HandleStartNodeDaemon(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Printf("node exited with error: %s", err)
 	}
+
 	select {}
 }
 
