@@ -8,22 +8,22 @@ services:
       - blockchain-net 
     volumes:
       - data/satosi:/
-  bob: 
+  alice: 
     build: . 
     ports: 
       - "8082:8080" 
     networks: 
-      - blockchain-net
+      - blockchain-net 
     volumes:
-      - data/bob:/
-  alice: 
+      - data/alice:/
+  bob: 
     build: . 
     ports: 
       - "8083:8080" 
     networks: 
-      - blockchain-net 
+      - blockchain-net
     volumes:
-      - data/alice:/
+      - data/bob:/
 
 networks: 
   blockchain-net: 

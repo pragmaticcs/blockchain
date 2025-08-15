@@ -1,17 +1,25 @@
-FROM golang:1.19
+# syntax=docker.io/docker/dockerfile:1.7-labs
+FROM golang:1.23.4
+
+WORKDIR /app
 
 COPY go.mod go.sum ./
 
 RUN go mod download
 
-COPY *.go ./
+COPY --exclude=data . ./ 
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /blockchain
+RUN mkdir data
 
-EXPOSE 8080 
+RUN mkdir bin
 
-ARG DATA_DIR=""
-ARG WALLET_NAME="satoshi"
+RUN CGO_ENABLED=0 GOOS=linux go build -o bin/blockchain
 
-CMD ["/blockchain", "--listenAddr", ":8080", "--dataDir", ${DATA_DIR}, "--walletName", ${WALLET_NAME}, "node", "start"]
+EXPOSE 8081
+
+ARG DATA_DIR="data/satoshi"
+
+COPY $DATA_DIR data
+
+CMD ./bin/blockchain --dataDir ./data node start --daemon false
 

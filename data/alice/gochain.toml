@@ -5,9 +5,9 @@ dir = './'
 name = 'alice'
 
 [node.server]
-port = ':3002'
+port = ':8082'
 peers = [
-    ':3000',
-    ':3001'
+    ':8081',
+    ':8083'
 ]
 

@@ -5,9 +5,9 @@ dir = './'
 name = 'satoshi'
 
 [node.server]
-port = ':3000'
+port = ':8081'
 peers = [
-    ':3001',
-    ':3002'
+    ':8082',
+    ':8083'
 ]
 
