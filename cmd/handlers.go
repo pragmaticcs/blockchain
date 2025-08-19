@@ -73,7 +73,7 @@ func HandleSpawnNodeDaemon(cmd *cobra.Command, args []string) {
 
 	command := exec.Command(os.Args[0], daemonArgs...)
 
-	logFile := fmt.Sprintf("%s/gochaind.log", dataDir)
+	logFile := fmt.Sprintf("%s/gochain.log", dataDir)
 
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
