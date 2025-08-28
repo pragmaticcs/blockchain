@@ -122,3 +122,6 @@ A HUGE thanks to these helpful resources without which this hobby project wouldn
 -   [Mastering Blockchain: Unlocking the Power of Cryptocurrencies, Smart Contracts, and Decentralized Applications](https://a.co/d/gQbf4kK) - A book by Lorne Lantz and Daniel Cawrey that sparked my curiosity about the inner workings of blockchain.
 -   [Bitcoin Developer Docs](https://developer.bitcoin.org/reference/intro.html) - Official Bitcoin documentation.
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
