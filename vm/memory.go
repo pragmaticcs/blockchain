@@ -27,7 +27,7 @@ type ValueInt struct {
 }
 
 func NewValueInt(i int32) (Value, error) {
-	data := [4]byte{}
+	data := [ValueIntSize]byte{}
 	_, err := binary.Encode(data[:], binary.BigEndian, i)
 	if err != nil {
 		return Value{}, err
@@ -39,7 +39,7 @@ func NewValueInt(i int32) (Value, error) {
 }
 
 func NewValueBool(b bool) (Value, error) {
-	data := [1]byte{}
+	data := [ValueBoolSize]byte{}
 	_, err := binary.Encode(data[:], binary.BigEndian, b)
 	if err != nil {
 		return Value{}, err
@@ -68,7 +68,7 @@ type Chunk struct {
 
 func NewChunk() *Chunk {
 	return &Chunk{
-		Bytecode: make([]byte, 0, 1024),
+		Bytecode: make([]byte, 0),
 	}
 }
 

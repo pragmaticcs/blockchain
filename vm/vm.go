@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+const (
+	StackSize = 256
+)
+
 type VM struct {
 	Chunk *Chunk
 	Ip    int
@@ -26,7 +30,7 @@ type Stack struct {
 
 func NewStack() *Stack {
 	return &Stack{
-		Stack:    make([]Value, 256),
+		Stack:    make([]Value, StackSize),
 		StackTop: 0,
 	}
 }
@@ -41,6 +45,10 @@ func (s *Stack) Push(v Value) {
 	s.StackTop++
 }
 
+func (s *Stack) Dup() {
+	s.Push(s.Stack[s.StackTop-1])
+}
+
 func (v *VM) ParseValue() Value {
 	var value Value
 	value.Type = ValueType(v.Chunk.Bytecode[v.Ip])
@@ -53,16 +61,15 @@ func (v *VM) ParseValue() Value {
 		offset = ValueBoolSize
 	}
 	value.Data = v.Chunk.Bytecode[v.Ip : v.Ip+offset]
-	fmt.Println(value.Data)
 	v.Ip += offset
 	return value
 }
 
-func (v *VM) BinaryOp(op OpCode) (Value, error) {
+func (v *VM) BinaryOp(op OpCode) error {
 	a := v.Stack.Pop()
 	b := v.Stack.Pop()
 	if a.Type != ValueTypeInt || b.Type != ValueTypeInt {
-		return Value{}, errors.New("values must be ints")
+		return errors.New("values must be ints")
 	}
 	_, aInt, _ := a.VisitAsInt()
 	_, bInt, _ := b.VisitAsInt()
@@ -74,9 +81,12 @@ func (v *VM) BinaryOp(op OpCode) (Value, error) {
 		cInt = aInt * bInt
 	case OP_SUB:
 		cInt = aInt - bInt
+	case OP_DIV:
+		cInt = aInt / bInt
 	}
 	value, _ := NewValueInt(cInt)
-	return value, nil
+	v.Stack.Push(value)
+	return nil
 }
 
 func (v *VM) Consume() byte {
@@ -101,20 +111,38 @@ func (v *VM) Run() error {
 		case OP_POP:
 			fmt.Println("OP_POP")
 			v.Stack.Pop()
+		case OP_DUP:
+			fmt.Println("OP_DUP")
+			v.Stack.Dup()
 		case OP_ADD:
 			fmt.Println("OP_ADD")
-			val, err := v.BinaryOp(OP_ADD)
+			err := v.BinaryOp(OP_ADD)
 			if err != nil {
 				return err
 			}
-			v.Stack.Push(val)
 		case OP_SUB:
 			fmt.Println("OP_SUB")
-			val, err := v.BinaryOp(OP_SUB)
+			err := v.BinaryOp(OP_SUB)
 			if err != nil {
 				return err
 			}
-			v.Stack.Push(val)
+		case OP_MULT:
+			fmt.Println("OP_MULT")
+			err := v.BinaryOp(OP_MULT)
+			if err != nil {
+				return err
+			}
+		case OP_DIV:
+			fmt.Println("OP_DIV")
+			err := v.BinaryOp(OP_DIV)
+			if err != nil {
+				return err
+			}
+		case MSTORE:
+
+		case MLOAD:
+		case SSTORE:
+		case SLOAD:
 		case OP_PRINT:
 			fmt.Println("OP_PRINT")
 			v.PrintValue(v.Stack.Pop())
