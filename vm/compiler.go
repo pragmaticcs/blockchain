@@ -6,7 +6,8 @@ const (
 	// Stack manipulation
 	OP_PUSH OpCode = iota
 	OP_POP
-	OP_DUP
+	OP_DUP1
+	OP_DUP2
 
 	// Arithmetic
 	OP_ADD

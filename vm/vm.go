@@ -111,7 +111,7 @@ func (v *VM) Run() error {
 		case OP_POP:
 			fmt.Println("OP_POP")
 			v.Stack.Pop()
-		case OP_DUP:
+		case OP_DUP1:
 			fmt.Println("OP_DUP")
 			v.Stack.Dup()
 		case OP_ADD:
