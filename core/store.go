@@ -6,7 +6,8 @@ type Store interface {
 	// a blockchain is immutable by design
 	PutBlock(block *Block) error
 	GetBlock(hash BlockHash) (*Block, error)
-	Exists(hash BlockHash) bool
+	BlockExists(hash BlockHash) bool
+	TxExists(id TransactionID) bool
 	GetBlockchainHead() (*Block, error)
 	SetBlockchainHead(block *Block) error
 

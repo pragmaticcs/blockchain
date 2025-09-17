@@ -368,9 +368,10 @@ func (n *Node) itemExists(item p2p.InvVector) bool {
 	// TODO: query items more efficiently, not one by one
 	switch item.Type {
 	case p2p.InvTypeBlock:
-		return n.StateManager.Blockchain.Store.Exists(item.Hash)
+		return n.StateManager.Blockchain.Store.BlockExists(item.Hash)
 	case p2p.InvTypeTx:
-		return n.Mempool.TxExists(item.Hash)
+		return n.Mempool.TxExists(item.Hash) ||
+			n.StateManager.Blockchain.Store.TxExists(core.TransactionID(item.Hash))
 	}
 	return false
 }
@@ -418,7 +419,7 @@ func (n *Node) HandleGetDataTx(item p2p.InvVector, addr string) error {
 }
 
 func (n *Node) HandleGetDataBlock(item p2p.InvVector, addr string) error {
-	if !n.StateManager.Blockchain.Store.Exists(item.Hash) {
+	if !n.itemExists(item) {
 		log.Printf("fn <HandleGetDataBlock> requested block %s not found\n", hex.EncodeToString(item.Hash))
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
 		return n.PeerManager.SendMessage(addr, messageNotFound)
@@ -446,7 +447,10 @@ func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
 		return err
 	}
 
-	if n.Mempool.TxExists(msgTx.Tx.ID[:]) {
+	if n.itemExists(p2p.InvVector{
+		Type: p2p.InvTypeTx,
+		Hash: msgTx.Tx.ID[:],
+	}) {
 		return nil
 	}
 
@@ -514,7 +518,7 @@ func (n *Node) HandleRpcGetBlocks(rpc p2p.RPC) error {
 	if err != nil {
 		return err
 	}
-	if !n.StateManager.Blockchain.Store.Exists(msgGetBlocks.From) {
+	if !n.StateManager.Blockchain.Store.BlockExists(msgGetBlocks.From) {
 		log.Printf("fn <HandleRpcGetBlocks> Requested block %s not found\n", hex.EncodeToString(msgGetBlocks.From))
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
 		return n.PeerManager.SendMessage(rpc.From, messageNotFound)

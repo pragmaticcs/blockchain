@@ -28,6 +28,7 @@ func (b BadgerPrefix) DeconstructKey(key []byte) []byte {
 var (
 	blockPrefix       = NewBadgerPrefix([]byte("block-"))
 	utxoPrefix        = NewBadgerPrefix([]byte("utxo-"))
+	txPrefix          = NewBadgerPrefix([]byte("tx-"))
 	blockchainHeadKey = []byte("blockchainhead-")
 )
 
@@ -47,7 +48,7 @@ func NewBadgerStore(path string) (*BadgerStore, error) {
 	}, nil
 }
 
-func (b *BadgerStore) Exists(hash BlockHash) bool {
+func (b *BadgerStore) BlockExists(hash BlockHash) bool {
 	exists := true
 	b.DB.View(func(txn *badger.Txn) error {
 		key := blockPrefix.ConstructKey(hash)
@@ -56,6 +57,19 @@ func (b *BadgerStore) Exists(hash BlockHash) bool {
 			exists = false
 		}
 		return nil
+	})
+	return exists
+}
+
+func (b *BadgerStore) TxExists(id TransactionID) bool {
+	exists := true
+	b.DB.View(func(txn *badger.Txn) error {
+		key := txPrefix.ConstructKey(id[:])
+		_, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			exists = false
+		}
+		return err
 	})
 	return exists
 }
@@ -78,13 +92,24 @@ func (b *BadgerStore) GetBlock(hash BlockHash) (*Block, error) {
 }
 
 func (b *BadgerStore) PutBlock(block *Block) error {
-	value, err := utils.EncodeInGob(block)
+	blockData, err := utils.EncodeInGob(block)
 	if err != nil {
 		return err
 	}
-	key := blockPrefix.ConstructKey(block.GetHash())
+
 	return b.DB.Update(func(txn *badger.Txn) error {
-		return txn.Set(key, value)
+		blockKey := blockPrefix.ConstructKey(block.GetHash())
+		if err := txn.Set(blockKey, blockData); err != nil {
+			return err
+		}
+
+		for _, tx := range block.Transactions {
+			txKey := txPrefix.ConstructKey(tx.ID[:])
+			if err := txn.Set(txKey, block.GetHash()); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

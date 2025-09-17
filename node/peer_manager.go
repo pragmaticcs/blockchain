@@ -87,7 +87,6 @@ func (p *PeerManager) SendMessage(addr string, msg *p2p.Message) error {
 
 func (p *PeerManager) Broadcast(msg *p2p.Message) {
 	peers := p.GetBroadcastCandidates()
-	log.Printf("fn <Broadcast> broadcast candidates: %s", peers)
 
 	var msgEncoder *p2p.MessageEncoder
 	for _, peer := range peers {
