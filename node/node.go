@@ -283,8 +283,10 @@ func (n *Node) HandlePeriodicTasks() error {
 	balance, _ := n.StateManager.GetBalance()
 	log.Printf("current balance = %d", balance)
 
-	n.PeerManager.PingPeers()
-	n.PeerManager.TrimPeers()
+	// TODO: Fix pinging/disconnecting peers
+
+	// n.PeerManager.PingPeers()
+	// n.PeerManager.TrimPeers()
 
 	return nil
 }

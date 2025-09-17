@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/pragmaticcs/blockchain/node"
 	"github.com/pragmaticcs/blockchain/wallet"
@@ -157,10 +156,15 @@ func HandleWalletNew(cmd *cobra.Command, args []string) {
 
 func SendIpcRequest(command node.IpcCommand, payload any) (*node.IpcResponse, error) {
 	socketPath := fmt.Sprintf("%s/gochain.sock", dataDir)
-	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+	addr, err := net.ResolveUnixAddr("unix", socketPath)
 	if err != nil {
-		log.Printf("error connecting to node daemon at path %s\n", socketPath)
+		return nil, fmt.Errorf("error resolving unix socket address %s", socketPath)
 	}
+	conn, err := net.DialUnix("unix", nil, addr)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to node daemon at path %s: %s", socketPath, err)
+	}
+
 	defer conn.Close()
 
 	var rawPayload json.RawMessage
