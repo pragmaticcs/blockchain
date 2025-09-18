@@ -1,66 +1,6 @@
 package vm
 
-import (
-	"encoding/binary"
-)
-
-type ValueType byte
-
-const (
-	ValueTypeInt ValueType = iota
-	ValueTypeBool
-)
-
-const (
-	ValueIntSize  = 4
-	ValueBoolSize = 1
-)
-
-type Value struct {
-	Type ValueType
-	Data []byte
-}
-
-type ValueInt struct {
-	Type ValueType
-	Int  int32
-}
-
-func NewValueInt(i int32) (Value, error) {
-	data := [ValueIntSize]byte{}
-	_, err := binary.Encode(data[:], binary.BigEndian, i)
-	if err != nil {
-		return Value{}, err
-	}
-	return Value{
-		Type: ValueTypeInt,
-		Data: data[:],
-	}, nil
-}
-
-func NewValueBool(b bool) (Value, error) {
-	data := [ValueBoolSize]byte{}
-	_, err := binary.Encode(data[:], binary.BigEndian, b)
-	if err != nil {
-		return Value{}, err
-	}
-	return Value{
-		Type: ValueTypeInt,
-		Data: data[:],
-	}, nil
-}
-
-func (v Value) VisitAsInt() (int, int32, error) {
-	var value int32
-	n, err := binary.Decode(v.Data, binary.BigEndian, &value)
-	return n, value, err
-}
-
-func (v Value) VisitAsBool() (int, bool, error) {
-	var value bool
-	n, err := binary.Decode(v.Data, binary.BigEndian, &value)
-	return n, value, err
-}
+import "encoding/binary"
 
 type Chunk struct {
 	Bytecode []byte
@@ -81,7 +21,14 @@ func (c *Chunk) EmitBytes(b1, b2 byte) {
 	c.Bytecode = append(c.Bytecode, b2)
 }
 
-func (c *Chunk) EmitValue(val Value) {
-	c.Bytecode = append(c.Bytecode, byte(val.Type))
-	c.Bytecode = append(c.Bytecode, val.Data...)
+func (c *Chunk) EmitInt32(val int32) {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, uint32(val))
+	c.Bytecode = append(c.Bytecode, bytes...)
+}
+
+func (c *Chunk) EmitInt64(val int64) {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, uint64(val))
+	c.Bytecode = append(c.Bytecode, bytes...)
 }

@@ -8,12 +8,10 @@ import (
 
 func TestVM(t *testing.T) {
 	c := NewChunk()
-	c.EmitByte(byte(OP_PUSH))
-	val, _ := NewValueInt(1)
-	c.EmitValue(val)
-	c.EmitByte(byte(OP_PUSH))
-	val, _ = NewValueInt(2)
-	c.EmitValue(val)
+	c.EmitByte(byte(OP_PUSH4))
+	c.EmitInt32(int32(2))
+	c.EmitByte(byte(OP_PUSH4))
+	c.EmitInt32(int32(3))
 	c.EmitByte(byte(OP_ADD))
 	c.EmitByte(byte(OP_PRINT))
 

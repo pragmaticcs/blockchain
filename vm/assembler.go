@@ -1,12 +1,17 @@
 package vm
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type OpCode byte
 
 const (
 	// Stack manipulation
-	OP_PUSH OpCode = iota
+	OP_PUSH1 OpCode = iota
+	OP_PUSH4
+	OP_PUSH8
 	OP_POP
 	OP_DUP1
 	OP_DUP2
@@ -35,6 +40,12 @@ const (
 	OP_PRINT
 	OP_END
 )
+
+var tokenPushLengths = map[TokenType]int{
+	TOKEN_PUSH1: 1,
+	TOKEN_PUSH4: 4,
+	TOKEN_PUSH8: 8,
+}
 
 type Assembler struct {
 	symbolicTable map[string]int
@@ -74,12 +85,14 @@ func (a *Assembler) FirstPass() error {
 			} else {
 				return fmt.Errorf("[%d] expected `:` after label", token.Line)
 			}
-		case TOKEN_PUSH:
+		case TOKEN_PUSH1, TOKEN_PUSH4, TOKEN_PUSH8:
 			if a.peek(0).Type != TOKEN_NUMBER {
-				return fmt.Errorf("[%d] expected number after PUSH", token.Line)
+				return fmt.Errorf("[%d] expected number after PUSH<N>", token.Line)
 			}
 			a.consume()
-			locCounter += 5
+			locCounter += 1 + tokenPushLengths[token.Type]
+		case TOKEN_NUMBER:
+			return fmt.Errorf("[%d] unexpected number", token.Line)
 		case TOKEN_ADD, TOKEN_DIV, TOKEN_MULT, TOKEN_SUB, TOKEN_POP, TOKEN_PRINT:
 			locCounter += 1
 		case TOKEN_EOF:
@@ -101,6 +114,41 @@ func (a *Assembler) peek(offset int) Token {
 	return a.tokens[a.currToken+offset]
 }
 
-func (A *Assembler) SecondPass() (*Chunk, error) {
-	return nil, nil
+func (a *Assembler) SecondPass() (*Chunk, error) {
+	a.currToken = 0 // reset from the first pass
+Loop:
+	for {
+		token := a.consume()
+		switch token.Type {
+		case TOKEN_IDENTIFIER:
+			if a.peek(0).Type == TOKEN_COLON {
+				a.consume() // consume colon
+			} else {
+				return nil, fmt.Errorf("[%d] unexpected identifier '%s'", token.Line, token.Lexeme)
+			}
+		case TOKEN_COLON:
+			return nil, fmt.Errorf("[%d] unexpected `:`", token.Line)
+		case TOKEN_PUSH4:
+			a.chunk.EmitByte(byte(OP_PUSH4))
+			numToken := a.consume() // don't need to check if it is a number
+			// cause we already checked it in the first pass
+			val, _ := strconv.Atoi(numToken.Lexeme)
+			a.chunk.EmitInt32(int32(val))
+		case TOKEN_PUSH1:
+			numToken := a.consume()
+			val, _ := strconv.Atoi(numToken.Lexeme)
+			a.chunk.EmitByte(byte(val))
+		case TOKEN_POP:
+			a.chunk.EmitByte(byte(OP_POP))
+		case TOKEN_ADD:
+			a.chunk.EmitByte(byte(OP_ADD))
+		case TOKEN_SUB:
+			a.chunk.EmitByte(byte(OP_SUB))
+		case TOKEN_PRINT:
+			a.chunk.EmitByte(byte(OP_PRINT))
+		case TOKEN_EOF:
+			break Loop
+		}
+	}
+	return a.chunk, nil
 }

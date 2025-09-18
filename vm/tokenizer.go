@@ -15,7 +15,9 @@ const (
 	TOKEN_IDENTIFIER
 	TOKEN_NUMBER
 
-	TOKEN_PUSH
+	TOKEN_PUSH1
+	TOKEN_PUSH4
+	TOKEN_PUSH8
 	TOKEN_POP
 	TOKEN_ADD
 	TOKEN_SUB
@@ -28,7 +30,9 @@ const (
 )
 
 var keywords = map[string]TokenType{
-	"PUSH":  TOKEN_PUSH,
+	"PUSH1": TOKEN_PUSH1,
+	"PUSH4": TOKEN_PUSH4,
+	"PUSH8": TOKEN_PUSH8,
 	"POP":   TOKEN_POP,
 	"ADD":   TOKEN_ADD,
 	"SUB":   TOKEN_SUB,
@@ -157,7 +161,7 @@ func (t *Tokenizer) isAtEnd() bool {
 
 func (t *Tokenizer) consume() rune {
 	defer func() { t.current++ }()
-	return rune(t.fileData[t.current])
+	return t.peek()
 }
 
 func (t *Tokenizer) peek() rune {
