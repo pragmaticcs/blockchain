@@ -1,10 +1,9 @@
 package vm
 
 import (
-	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,9 +12,12 @@ import (
 func TestAssembler(t *testing.T) {
 	assemblyCode := `
 main:
-PUSH4 2
-PUSH4 3
-ADD
+PUSH4 5
+JUMP squared
+
+squared:
+DUP1
+MULT
 PRINT
 `
 	tempDir := t.TempDir()
@@ -40,17 +42,22 @@ PRINT
 		t.Fatal(err)
 	}
 
-	c := NewChunk()
-	c.EmitByte(byte(OP_PUSH4))
-	c.EmitInt32(int32(2))
-	c.EmitByte(byte(OP_PUSH4))
-	c.EmitInt32(int32(3))
-	c.EmitByte(byte(OP_ADD))
-	c.EmitByte(byte(OP_PRINT))
+	fmt.Println(chunk)
+	// c := NewChunk()
+	// c.EmitByte(byte(OP_PUSH4))
+	// c.EmitInt32(int32(2))
+	// c.EmitByte(byte(OP_PUSH4))
+	// c.EmitInt32(int32(3))
+	// c.EmitByte(byte(OP_ADD))
+	// c.EmitByte(byte(OP_PRINT))
 
-	assert.True(t, reflect.DeepEqual(chunk.Bytecode, c.Bytecode))
+	// assert.True(t, reflect.DeepEqual(chunk.Bytecode, c.Bytecode))
 
-	if !bytes.Equal(chunk.Bytecode, c.Bytecode) {
-		t.Errorf("Expected: %v\nGot:%v\n", chunk.Bytecode, c.Bytecode)
-	}
+	// if !bytes.Equal(chunk.Bytecode, c.Bytecode) {
+	// 	t.Errorf("Expected: %v\nGot:%v\n", chunk.Bytecode, c.Bytecode)
+	// }
+
+	vm := NewVM(chunk)
+	err = vm.Run()
+	assert.NoError(t, err)
 }

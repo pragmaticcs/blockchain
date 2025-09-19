@@ -18,7 +18,10 @@ const (
 	TOKEN_PUSH1
 	TOKEN_PUSH4
 	TOKEN_PUSH8
+	TOKEN_JUMP
+	TOKEN_JUMPI
 	TOKEN_POP
+	TOKEN_DUP1
 	TOKEN_ADD
 	TOKEN_SUB
 	TOKEN_DIV
@@ -39,6 +42,9 @@ var keywords = map[string]TokenType{
 	"DIV":   TOKEN_DIV,
 	"MULT":  TOKEN_MULT,
 	"PRINT": TOKEN_PRINT,
+	"JUMP":  TOKEN_JUMP,
+	"JUMPI": TOKEN_JUMPI,
+	"DUP1":  TOKEN_DUP1,
 }
 
 type Token struct {

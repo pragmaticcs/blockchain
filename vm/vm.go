@@ -60,6 +60,7 @@ func (s *Stack) Dup() {
 func (v *VM) ParseValue(op OpCode) Value {
 	var value Value
 	offset := opcodePushLengths[op]
+
 	data := v.Chunk.Bytecode[v.Ip : v.Ip+offset]
 	copy(value[32-offset:], data)
 
@@ -102,21 +103,15 @@ func bigIntToValue(i *big.Int) Value {
 	return v
 }
 
-func (v *VM) Consume() byte {
-	defer func() { v.Ip++ }()
-	return v.Peek(0)
-}
-
-func (v *VM) Peek(offset int) byte {
-	if v.Ip+offset >= len(v.Chunk.Bytecode) {
-		return byte(OP_END)
-	}
-	return v.Chunk.Bytecode[v.Ip+offset]
+func (v *VM) readByte() byte {
+	b := v.Chunk.Bytecode[v.Ip]
+	v.Ip++
+	return b
 }
 
 func (v *VM) Run() error {
 	for {
-		op := OpCode(v.Consume())
+		op := OpCode(v.readByte())
 		switch op {
 		case OP_PUSH1, OP_PUSH4, OP_PUSH8:
 			fmt.Println("OP_PUSH")
@@ -152,6 +147,11 @@ func (v *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case OP_JUMP:
+			fmt.Println("OP_JUMP")
+			addrValue := v.Stack.Pop()
+			addrInt := new(big.Int).SetBytes(addrValue[:])
+			v.Ip = int(addrInt.Int64())
 		case MSTORE:
 		case MLOAD:
 		case SSTORE:
