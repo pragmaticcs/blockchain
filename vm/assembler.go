@@ -23,6 +23,9 @@ const (
 	OP_DIV
 
 	// Logic
+	OP_EQ
+	OP_GT
+	OP_LT
 	OP_AND
 	OP_OR
 
