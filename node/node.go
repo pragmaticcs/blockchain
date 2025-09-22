@@ -25,6 +25,7 @@ var (
 const MaxWorkers int = 8
 const DefaultMineReward = 5
 const PeriodicTaskFreq = 5
+const MaxMempoolSize = 5
 
 type PeriodicTask func() error
 
@@ -89,7 +90,7 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	}
 	node := &Node{
 		StateManager:     stateManager,
-		Mempool:          NewMempool(),
+		Mempool:          NewMempool(MaxMempoolSize),
 		Transport:        nil,
 		PeerManager:      nil,
 		SyncManager:      nil,
@@ -464,8 +465,12 @@ func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
 
 	log.Println("fn <HandleRpcTx>: verified transaction")
 
-	n.Mempool.AddTx(&msgTx.Tx)
-	n.Miner.StartMining()
+	ok := n.Mempool.AddTx(&msgTx.Tx)
+	if ok {
+		log.Println("fn <HandleRpcTx>: resetting mining process")
+		n.Miner.Reset()
+		n.Miner.StartMining()
+	}
 
 	n.BroadcastInv(msgTx.Tx.ID[:], p2p.InvTypeTx)
 	return nil
@@ -486,7 +491,7 @@ func (n *Node) HandleRpcBlock(rpc p2p.RPC) error {
 	err = n.ProcessBlock(block)
 	if err == ErrInvalidBlock {
 		n.PeerManager.PenalizePeer(30, rpc.From)
-		return nil
+		return NewNodeError(fmt.Sprintf("block recieved from [%s] is not valid", rpc.From))
 	}
 	if err != nil {
 		return err
@@ -607,7 +612,12 @@ func (n *Node) Send(to wallet.Address, amount, fee int) error {
 	if err != nil {
 		return err
 	}
-	n.Mempool.AddTx(tx)
+	// TODO: Check if this is correct
+	ok := n.Mempool.AddTx(tx)
+	if !ok {
+		return NewNodeError("node mempool is full")
+	}
+	n.Miner.Reset()
 	n.Miner.StartMining()
 
 	n.BroadcastInv(tx.ID[:], p2p.InvTypeTx)

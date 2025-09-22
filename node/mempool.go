@@ -9,12 +9,14 @@ import (
 type Mempool struct {
 	transactions map[core.TransactionID]*core.Transaction
 	lock         sync.RWMutex
+	maxSize      int
 }
 
-func NewMempool() *Mempool {
+func NewMempool(maxSize int) *Mempool {
 	return &Mempool{
 		transactions: make(map[core.TransactionID]*core.Transaction),
 		lock:         sync.RWMutex{},
+		maxSize:      maxSize,
 	}
 }
 
@@ -51,10 +53,14 @@ func (m *Mempool) TxExists(txID []byte) bool {
 	return ok
 }
 
-func (m *Mempool) AddTx(tx *core.Transaction) {
+func (m *Mempool) AddTx(tx *core.Transaction) bool {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	if len(m.transactions)+1 > m.maxSize {
+		return false
+	}
 	m.transactions[tx.ID] = tx
+	return true
 }
 
 func (m *Mempool) RemoveTx(txID core.TransactionID) {

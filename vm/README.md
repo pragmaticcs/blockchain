@@ -1,3 +1,3 @@
 # Migration to a VM based architecture
 
-Work in progress!!!
+The plan is to migrate to a VM based architecture in the future.

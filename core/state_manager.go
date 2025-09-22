@@ -10,7 +10,7 @@ import (
 
 // Just for testing purposes
 const (
-	DefaultDifficulty = 26
+	DefaultDifficulty = 30
 )
 
 type StateManager struct {
