@@ -113,12 +113,13 @@ func (u *UTXOset) FindSpendableAmount(pubKeyHash []byte) (int, error) {
 	return int(balance), nil
 }
 
-func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int) (int64, []OutPoint) {
+func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int, reservedOuts map[OutPoint]struct{}) (int64, []OutPoint) {
 	// Returns the spendable outputs of an account with pubKeyHash
 	var utxos []OutPoint
 	var currSum int64 = 0
 	_ = u.Store.ForEachUTXO(func(outPoint OutPoint, out TxOutput) error {
-		if out.IsLockedWithKey(pubKeyHash) && currSum < int64(amount) {
+		_, reserved := reservedOuts[outPoint]
+		if !reserved && out.IsLockedWithKey(pubKeyHash) && currSum < int64(amount) {
 			currSum += out.Value
 			utxos = append(utxos, outPoint)
 			if currSum >= int64(amount) {

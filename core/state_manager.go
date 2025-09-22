@@ -10,7 +10,7 @@ import (
 
 // Just for testing purposes
 const (
-	DefaultDifficulty = 30
+	DefaultDifficulty = 28
 )
 
 type StateManager struct {
@@ -62,7 +62,7 @@ func (s *StateManager) GetBalance() (int, error) {
 	return s.UtxoSet.FindSpendableAmount(pubKeyHash)
 }
 
-func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*Transaction, error) {
+func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reservedOuts map[OutPoint]struct{}) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -75,7 +75,8 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*Tran
 		return nil, err
 	}
 	needed := int64(amount + fee)
-	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, int(needed))
+
+	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, int(needed), reservedOuts)
 	if sum < needed {
 		return nil, wallet.ErrorInsufficientBalance
 	}

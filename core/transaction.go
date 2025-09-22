@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"slices"
 
 	"github.com/pragmaticcs/blockchain/crypto"
 )
@@ -117,6 +118,15 @@ func (in *TxInput) UsesKey(pubkeyHash []byte) (bool, error) {
 		return false, err
 	}
 	return bytes.Equal(lockingHash, pubkeyHash), nil
+}
+
+func (tx *Transaction) OwnedBy(pubKey crypto.PubKey) bool {
+	for _, in := range tx.Inputs {
+		if slices.Equal(in.PubKey, pubKey) {
+			return true
+		}
+	}
+	return false
 }
 
 func LockOutput(out *TxOutput, address []byte) {
