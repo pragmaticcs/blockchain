@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/pragmaticcs/blockchain/core"
+	"github.com/pragmaticcs/blockchain/crypto"
 )
 
 type Mempool struct {
@@ -29,6 +30,21 @@ func (m *Mempool) GetTransactions() []*core.Transaction {
 		txs = append(txs, tx)
 	}
 	return txs
+}
+
+func (m *Mempool) GetReservedOutputs(pubKey crypto.PubKey) map[core.OutPoint]struct{} {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	reserved := make(map[core.OutPoint]struct{})
+	for _, tx := range m.transactions {
+		if tx.OwnedBy(pubKey) {
+			for _, in := range tx.Inputs {
+				outPoint := core.NewOutPoint(in.TxID, in.OutID)
+				reserved[outPoint] = struct{}{}
+			}
+		}
+	}
+	return reserved
 }
 
 func (m *Mempool) GetTransaction(txID core.TransactionID) (*core.Transaction, bool) {

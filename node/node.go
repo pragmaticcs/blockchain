@@ -608,7 +608,8 @@ func (n *Node) RequestItems(peer p2p.Peer, items []p2p.InvVector) error {
 }
 
 func (n *Node) Send(to wallet.Address, amount, fee int) error {
-	tx, err := n.StateManager.NewTransaction(to, amount, fee)
+	reservedOutputs := n.Mempool.GetReservedOutputs(n.StateManager.Wallet.PublicKey)
+	tx, err := n.StateManager.NewTransaction(to, amount, fee, reservedOutputs)
 	if err != nil {
 		return err
 	}
