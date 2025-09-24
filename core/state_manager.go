@@ -10,7 +10,7 @@ import (
 
 // Just for testing purposes
 const (
-	DefaultDifficulty = 30
+	DefaultDifficulty = 28
 )
 
 type StateManager struct {
@@ -76,7 +76,6 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reserv
 	}
 	needed := int64(amount + fee)
 
-	// TODO: Check the mempool transactions too!!!
 	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, int(needed), reservedOuts)
 	if sum < needed {
 		return nil, wallet.ErrorInsufficientBalance
