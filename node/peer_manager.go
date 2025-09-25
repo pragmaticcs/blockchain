@@ -9,7 +9,7 @@ import (
 	"github.com/pragmaticcs/blockchain/p2p"
 )
 
-const PeerTimeout time.Duration = 10 * time.Second
+const PeerTimeout time.Duration = 15 * time.Second
 
 type PeerStatus uint8
 
@@ -104,6 +104,15 @@ func (p *PeerManager) RemovePeer(peer p2p.Peer) {
 	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	addr := peer.GetAddr()
+	delete(p.peers, addr)
+}
+
+func (p *PeerManager) removePeerUnlocked(peer p2p.Peer) {
+	if peer == nil {
+		return
+	}
 
 	addr := peer.GetAddr()
 	delete(p.peers, addr)
@@ -220,14 +229,21 @@ func (p *PeerManager) PingPeers() {
 
 func (p *PeerManager) TrimPeers() {
 	unsresponsivePeers := p.FindUnresponsivePeers()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	for _, peer := range unsresponsivePeers {
 		log.Printf("trimming unresponsive peer: %s", peer.GetAddr())
-		p.DisconnectPeer(peer)
+		p.disconnectPeerUnlocked(peer)
 	}
 }
 
 func (p *PeerManager) DisconnectPeer(peer p2p.Peer) {
 	p.RemovePeer(peer)
+	_ = peer.Close()
+}
+
+func (p *PeerManager) disconnectPeerUnlocked(peer p2p.Peer) {
+	p.removePeerUnlocked(peer)
 	_ = peer.Close()
 }
 

@@ -52,7 +52,7 @@ func DefaultNodeOpts() NodeOpts {
 }
 
 type Node struct {
-	StateManager *core.StateManager
+	StateManager *StateManager
 	Mempool      *Mempool
 	Transport    *p2p.TCPTransport // TODO: Replace with Transport interface
 	SyncManager  *SyncManager
@@ -84,12 +84,9 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't load wallet: %s", err))
 	}
-	stateManager, err := core.NewStateManager(blockchain, wallet)
-	if err != nil {
-		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the state manager: %s", err))
-	}
+
 	node := &Node{
-		StateManager:     stateManager,
+		StateManager:     nil,
 		Mempool:          NewMempool(MaxMempoolSize),
 		Transport:        nil,
 		PeerManager:      nil,
@@ -112,6 +109,11 @@ func NewNode(opts NodeOpts) (*Node, error) {
 	node.Transport = p2p.NewTCPTransport(transportOpts)
 	node.SyncManager = NewSyncManager(node.PeerManager, node)
 	node.Miner = NewMiner(node)
+	stateManager, err := NewStateManager(blockchain, wallet, node.Mempool)
+	if err != nil {
+		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the state manager: %s", err))
+	}
+	node.StateManager = stateManager
 	ipcServer, err := NewIpcServer(opts.DataDir, node)
 	if err != nil {
 		return nil, NewNodeError(fmt.Sprintf("couldn't initialize the ipc server: %s", err))
@@ -286,8 +288,8 @@ func (n *Node) HandlePeriodicTasks() error {
 
 	// TODO: Fix pinging/disconnecting peers
 
-	// n.PeerManager.PingPeers()
-	// n.PeerManager.TrimPeers()
+	n.PeerManager.PingPeers()
+	n.PeerManager.TrimPeers()
 
 	return nil
 }
@@ -404,7 +406,7 @@ func (n *Node) HandleGetDataTx(item p2p.InvVector, addr string) error {
 
 	if !ok {
 		messageNotFound := p2p.NewMessage(nil, p2p.RpcCommandNotFound)
-		log.Printf("fn <HandleGetDataTx> requested block %s not found\n", hex.EncodeToString(item.Hash))
+		log.Printf("fn <HandleGetDataTx> requested transaction %s not found\n", hex.EncodeToString(item.Hash))
 		return n.PeerManager.SendMessage(addr, messageNotFound)
 	}
 
@@ -455,7 +457,17 @@ func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
 		return nil
 	}
 
-	valid, _ := n.StateManager.Blockchain.VerifyTransaction(&msgTx.Tx)
+	valid := false
+
+	isChildTx, _ := n.Mempool.IsChildTx(msgTx.Tx)
+	if isChildTx {
+		txMap := n.Mempool.GetTransactionTable()
+		verified, _ := n.StateManager.Blockchain.VerifyTransaction(&msgTx.Tx, txMap)
+		valid = verified
+	} else {
+		verified, _ := n.StateManager.Blockchain.VerifyTransaction(&msgTx.Tx, nil)
+		valid = verified
+	}
 
 	if !valid {
 		// Penalize peer for invalid tx
@@ -465,11 +477,16 @@ func (n *Node) HandleRpcTx(rpc p2p.RPC) error {
 
 	log.Println("fn <HandleRpcTx>: verified transaction")
 
-	ok := n.Mempool.AddTx(&msgTx.Tx)
-	if ok {
-		log.Println("fn <HandleRpcTx>: resetting mining process")
-		n.Miner.Reset()
-		n.Miner.StartMining()
+	if !isChildTx {
+		ok := n.Mempool.AddTx(&msgTx.Tx)
+		if ok {
+			log.Println("fn <HandleRpcTx>: resetting mining process")
+			n.Miner.Reset()
+			n.Miner.StartMining()
+		}
+	} else {
+		n.Mempool.AddOrphanTx(&msgTx.Tx)
+		log.Println("fn <HandleRpcTx>: added orphan transaction to the mempool")
 	}
 
 	n.BroadcastInv(msgTx.Tx.ID[:], p2p.InvTypeTx)
@@ -608,18 +625,23 @@ func (n *Node) RequestItems(peer p2p.Peer, items []p2p.InvVector) error {
 }
 
 func (n *Node) Send(to wallet.Address, amount, fee int) error {
-	reservedOutputs := n.Mempool.GetReservedOutputs(n.StateManager.Wallet.PublicKey)
-	tx, err := n.StateManager.NewTransaction(to, amount, fee, reservedOutputs)
+	tx, err := n.StateManager.NewTransaction(to, amount, fee)
 	if err != nil {
 		return err
 	}
-	// TODO: Check if this is correct
-	ok := n.Mempool.AddTx(tx)
-	if !ok {
-		return NewNodeError("node mempool is full")
+	isChild, _ := n.Mempool.IsChildTx(*tx)
+	if !isChild {
+		// TODO: Check if this is correct
+		ok := n.Mempool.AddTx(tx)
+		if !ok {
+			// TODO: Add to orphan pool instead
+			return NewNodeError("node mempool is full")
+		}
+		n.Miner.Reset()
+		n.Miner.StartMining()
+	} else {
+		n.Mempool.AddOrphanTx(tx)
 	}
-	n.Miner.Reset()
-	n.Miner.StartMining()
 
 	n.BroadcastInv(tx.ID[:], p2p.InvTypeTx)
 	return nil
