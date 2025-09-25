@@ -1,3 +1,3 @@
 # Migration to a VM based architecture
 
-The plan is to migrate to a VM based architecture in the future.
+This module is a part of the plan to migrate the blockchain to a VM based architecture in the future (maybe).

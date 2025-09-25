@@ -105,7 +105,7 @@ func (m *Miner) Mine(ctx context.Context) error {
 		transactions = append(transactions, *tx)
 	}
 
-	pow := core.NewPOW(core.DefaultDifficulty)
+	pow := core.NewPOW(DefaultDifficulty)
 	block, err := m.Node.StateManager.Blockchain.NewBlock(transactions)
 	if err != nil {
 		return err

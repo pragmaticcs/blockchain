@@ -113,7 +113,7 @@ func (u *UTXOset) FindSpendableAmount(pubKeyHash []byte) (int, error) {
 	return int(balance), nil
 }
 
-func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int, reservedOuts map[OutPoint]struct{}) (int64, []OutPoint) {
+func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int, reservedOuts map[OutPoint]struct{}, availableOuts map[OutPoint]TxOutput) (int64, []OutPoint) {
 	// Returns the spendable outputs of an account with pubKeyHash
 	var utxos []OutPoint
 	var currSum int64 = 0
@@ -128,6 +128,10 @@ func (u *UTXOset) FindSpendableOutputs(pubKeyHash []byte, amount int, reservedOu
 		}
 		return nil
 	})
+	for outpoint, out := range availableOuts {
+		currSum += out.Value
+		utxos = append(utxos, outpoint)
+	}
 	return currSum, utxos
 }
 
