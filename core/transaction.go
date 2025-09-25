@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"slices"
 
 	"github.com/pragmaticcs/blockchain/crypto"
@@ -192,6 +193,8 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTxs map[TransactionID]
 }
 
 func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, error) {
+	log.Println("fn <tx.Verify> called")
+
 	if tx.IsCoinbase() {
 		return true, nil
 	}
@@ -224,6 +227,7 @@ func (tx *Transaction) Verify(prevTxs map[TransactionID]Transaction) (bool, erro
 }
 
 func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
+	// TODO: Replace with a simple db lookup instead
 	for block := range b.Iterate() {
 		for _, tx := range block.Transactions {
 			if tx.ID == id {
@@ -234,14 +238,22 @@ func (b *Blockchain) FindTransaction(id TransactionID) (*Transaction, error) {
 	return nil, NewTransactionError("transaction doesn't exist")
 }
 
-func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey) error {
+func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKey, unconfirmedTxs map[TransactionID]*Transaction) error {
 	if tx.IsCoinbase() {
 		return NewTransactionError("coinbase can't be signed")
 	}
 	prevTxs := make(map[TransactionID]Transaction)
 	for _, in := range tx.Inputs {
+		if unconfirmedTxs != nil {
+			prevTx, unconfirmed := unconfirmedTxs[in.TxID]
+			if unconfirmed {
+				prevTxs[prevTx.ID] = *prevTx
+				continue
+			}
+		}
 		prevTx, err := b.FindTransaction(in.TxID)
 		if err != nil {
+			log.Println("fn <SignTransaction> OOPS")
 			return err
 		}
 		prevTxs[prevTx.ID] = *prevTx
@@ -249,15 +261,23 @@ func (b *Blockchain) SignTransaction(tx *Transaction, privateKey ecdsa.PrivateKe
 	return tx.Sign(privateKey, prevTxs)
 }
 
-func (b *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
+func (b *Blockchain) VerifyTransaction(tx *Transaction, unconfirmedTxs map[TransactionID]*Transaction) (bool, error) {
+	// If unconfirmedTxs is set to nil then does a blockchain-only verification.
 	if tx.IsCoinbase() {
 		return true, nil
 	}
 	prevTxs := make(map[TransactionID]Transaction)
-
 	for _, in := range tx.Inputs {
+		if unconfirmedTxs != nil {
+			prevTx, unconfirmed := unconfirmedTxs[in.TxID]
+			if unconfirmed {
+				prevTxs[prevTx.ID] = *prevTx
+				continue
+			}
+		}
 		prevTx, err := b.FindTransaction(in.TxID)
 		if err != nil {
+			log.Println("fn <VerifyTransaction> OOPS")
 			return false, err
 		}
 		prevTxs[prevTx.ID] = *prevTx

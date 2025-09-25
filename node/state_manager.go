@@ -1,9 +1,10 @@
-package core
+package node
 
 import (
 	"fmt"
 	"sync"
 
+	"github.com/pragmaticcs/blockchain/core"
 	"github.com/pragmaticcs/blockchain/crypto"
 	"github.com/pragmaticcs/blockchain/wallet"
 )
@@ -14,16 +15,17 @@ const (
 )
 
 type StateManager struct {
-	Blockchain *Blockchain
-	UtxoSet    *UTXOset
+	Blockchain *core.Blockchain
+	UtxoSet    *core.UTXOset
 	Wallet     *wallet.Wallet
+	Mempool    *Mempool
 
 	// Mutexes
 	lock sync.RWMutex // Use when modifying the state of blockchain itself
 }
 
-func NewStateManager(b *Blockchain, w *wallet.Wallet) (*StateManager, error) {
-	utxoSet := NewUTXOset(b, b.Store)
+func NewStateManager(b *core.Blockchain, w *wallet.Wallet, m *Mempool) (*StateManager, error) {
+	utxoSet := core.NewUTXOset(b, b.Store)
 	err := utxoSet.Reindex()
 	if err != nil {
 		return nil, err
@@ -32,6 +34,7 @@ func NewStateManager(b *Blockchain, w *wallet.Wallet) (*StateManager, error) {
 		Blockchain: b,
 		Wallet:     w,
 		UtxoSet:    utxoSet,
+		Mempool:    m,
 		lock:       sync.RWMutex{},
 	}, nil
 }
@@ -46,7 +49,7 @@ func (s *StateManager) GetLatestBlockHeight() uint32 {
 	return s.Blockchain.CurrHeight
 }
 
-func (s *StateManager) GetBlockchainHead() BlockHash {
+func (s *StateManager) GetBlockchainHead() core.BlockHash {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.Blockchain.Head
@@ -62,9 +65,12 @@ func (s *StateManager) GetBalance() (int, error) {
 	return s.UtxoSet.FindSpendableAmount(pubKeyHash)
 }
 
-func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reservedOuts map[OutPoint]struct{}) (*Transaction, error) {
-	var inputs []TxInput
-	var outputs []TxOutput
+func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int) (*core.Transaction, error) {
+	var inputs []core.TxInput
+	var outputs []core.TxOutput
+
+	reservedOuts, availableOuts := s.Mempool.GetReservedOutputs(s.Wallet.PublicKey)
+	unconfirmedTxs := s.Mempool.GetTransactionTable()
 
 	selfAddress, err := s.Wallet.GetAddress()
 	if err != nil {
@@ -76,12 +82,12 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reserv
 	}
 	needed := int64(amount + fee)
 
-	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, int(needed), reservedOuts)
+	sum, outPoints := s.UtxoSet.FindSpendableOutputs(pubKeyHash, int(needed), reservedOuts, availableOuts)
 	if sum < needed {
 		return nil, wallet.ErrorInsufficientBalance
 	}
 	for _, outPoint := range outPoints {
-		in := TxInput{
+		in := core.TxInput{
 			TxID:   outPoint.TxID,
 			OutID:  outPoint.OutID,
 			Sig:    nil,
@@ -89,14 +95,14 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reserv
 		}
 		inputs = append(inputs, in)
 	}
-	outputs = append(outputs, *NewTxOutput(int64(amount), []byte(to))) // Transfer to reciever
+	outputs = append(outputs, *core.NewTxOutput(int64(amount), []byte(to))) // Transfer to reciever
 
 	if sum > needed {
-		outputs = append(outputs, *NewTxOutput(sum-needed, []byte(selfAddress))) // Transfer change back
+		outputs = append(outputs, *core.NewTxOutput(sum-needed, []byte(selfAddress))) // Transfer change back
 	}
 
-	tx := &Transaction{
-		ID:      TransactionZeroID,
+	tx := &core.Transaction{
+		ID:      core.TransactionZeroID,
 		Outputs: outputs,
 		Inputs:  inputs,
 	}
@@ -104,7 +110,7 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reserv
 	txID := tx.GetHash()
 	tx.ID = txID
 
-	err = s.Blockchain.SignTransaction(tx, s.Wallet.PrivateKey)
+	err = s.Blockchain.SignTransaction(tx, s.Wallet.PrivateKey, unconfirmedTxs)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +118,7 @@ func (s *StateManager) NewTransaction(to wallet.Address, amount, fee int, reserv
 	return tx, nil
 }
 
-func (s *StateManager) Update(block *Block) error {
+func (s *StateManager) Update(block *core.Block) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	err := s.Blockchain.AddBlock(block)
@@ -122,8 +128,8 @@ func (s *StateManager) Update(block *Block) error {
 	return s.UtxoSet.Update(block)
 }
 
-func (s *StateManager) Validate(block *Block) (bool, error) {
-	pow := NewPOW(block.Difficulty)
+func (s *StateManager) Validate(block *core.Block) (bool, error) {
+	pow := core.NewPOW(block.Difficulty)
 	valid := pow.Validate(block)
 	if !valid {
 		return false, nil
@@ -133,7 +139,7 @@ func (s *StateManager) Validate(block *Block) (bool, error) {
 			// TODO: Check if mining reward is the default one
 			continue
 		}
-		valid, err := s.Blockchain.VerifyTransaction(&tx)
+		valid, err := s.Blockchain.VerifyTransaction(&tx, nil)
 		if err != nil {
 			return false, err
 		}
@@ -144,10 +150,11 @@ func (s *StateManager) Validate(block *Block) (bool, error) {
 	return true, nil
 }
 
-func (s *StateManager) CalculateFee(tx *Transaction) (int, error) {
+func (s *StateManager) CalculateFee(tx *core.Transaction) (int, error) {
 	inputs := 0
 	for _, in := range tx.Inputs {
-		outPoint := NewOutPoint(in.TxID, in.OutID)
+		outPoint := core.NewOutPoint(in.TxID, in.OutID)
+
 		out, err := s.UtxoSet.Store.GetUTXO(outPoint)
 		if err != nil {
 			return -1, err

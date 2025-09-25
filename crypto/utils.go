@@ -20,10 +20,15 @@ func HashPublicKey(key PubKey) ([]byte, error) {
 	return publicKeyHash, nil
 }
 
-func Checksum(data []byte, length int) []byte {
+func DoubleChecksum(data []byte, length int) []byte {
 	first := sha256.Sum256(data)
 	second := sha256.Sum256(first[:])
 	return second[:][:length]
+}
+
+func Checksum(data []byte, length int) []byte {
+	sum := sha256.Sum256(data)
+	return sum[:][:length]
 }
 
 func EncodeToBase58(data []byte) []byte {

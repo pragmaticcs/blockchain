@@ -18,8 +18,6 @@ type MessageHeader struct {
 	Magic   uint32
 	Command RpcCommand
 	Length  uint32
-	// TODO: add checksum for the payload
-	// Checksum [4]byte
 }
 
 type Message struct {
