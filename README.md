@@ -32,15 +32,15 @@ While the current implementation covers core functionality, the following issues
 ### Building from source
 
 1.  Clone the repo:
-    ```sh
-    foo@bar:~$ https://github.com/pragmaticcs/blockchain.git
-    foo@bar:~$ cd blockchain
-    ```
+```sh
+git clone https://github.com/pragmaticcs/blockchain.git
+cd blockchain
+```
 
 2.  Build using make (this will create the executable in the projects bin directory):
-    ```sh
-    foo@bar:~/blockchain$ make build
-    ```
+```sh
+make build
+```
 
 ## CLI Usage
 
